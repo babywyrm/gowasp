@@ -8,20 +8,32 @@ import (
   "flag"
   "fmt"
   "io"
-  "io/ioutil"        // <<< added
+  "io/ioutil"
   "log"
   "net/http"
   "os"
   "os/exec"
   "path/filepath"
-  "regexp"           // <<< added
+  "regexp"
   "strings"
   "time"
 
   "github.com/bmatcuk/doublestar/v4"
 )
 
-// Finding represents a single security finding.
+// -----------------------------
+// Rule & Finding Structs
+// -----------------------------
+type Rule struct {
+  Name        string
+  Regex       string
+  Pattern     *regexp.Regexp
+  Severity    string
+  Category    string
+  Description string
+  Remediation string
+}
+
 type Finding struct {
   File      string    `json:"file"`
   Line      int       `json:"line"`
@@ -32,22 +44,38 @@ type Finding struct {
   Timestamp time.Time `json:"timestamp"`
 }
 
+var rules []Rule
+var ruleMap = map[string]Rule{}
+
 var supportedExtensions = map[string]bool{
   ".go": true, ".js": true, ".py": true, ".java": true, ".html": true,
 }
 
-// ruleMap lets us look up full Rule metadata by name
-var ruleMap = map[string]Rule{}
+// -----------------------------
+// InitRules() fallback
+// -----------------------------
+func InitRules() []Rule {
+  return []Rule{
+    {
+      Name:        "HardcodedPassword",
+      Regex:       `(?i)password\s*=\s*['"].+['"]`,
+      Pattern:     regexp.MustCompile(`(?i)password\s*=\s*['"].+['"]`),
+      Severity:    "HIGH",
+      Category:    "A02",
+      Description: "Possible hardcoded password",
+      Remediation: "Remove or secure the credential via secrets manager or env var",
+    },
+  }
+}
 
-// --------------------------------------------------------------------------
-// JSON‐loader for external rules.json
-// --------------------------------------------------------------------------
+// -----------------------------
+// Load Rules from JSON file
+// -----------------------------
 func loadRulesFromFile(path string) ([]Rule, error) {
   data, err := ioutil.ReadFile(path)
   if err != nil {
     return nil, err
   }
-  // intermediate shape matching JSON
   var jr []struct {
     Name        string `json:"name"`
     Pattern     string `json:"pattern"`
@@ -75,13 +103,16 @@ func loadRulesFromFile(path string) ([]Rule, error) {
 }
 
 func init() {
-  // this will be overridden in main() if -rules is passed
-  ruleMap = InitRules()
+  ruleMap = make(map[string]Rule)
+  rules = InitRules()
+  for _, r := range rules {
+    ruleMap[r.Name] = r
+  }
 }
 
-// --------------------------------------------------------------------------
-// (rest of your code: runCommand, getGitChangedFiles, ignore logic, scanFile, scanDir…)
-// --------------------------------------------------------------------------
+// -----------------------------
+// Command Execution
+// -----------------------------
 func runCommand(ctx context.Context, cmd string, args ...string) (string, error) {
   c := exec.CommandContext(ctx, cmd, args...)
   out, err := c.CombinedOutput()
@@ -96,6 +127,9 @@ func getGitChangedFiles(ctx context.Context) ([]string, error) {
   return strings.Split(strings.TrimSpace(out), "\n"), nil
 }
 
+// -----------------------------
+// Ignore Patterns
+// -----------------------------
 func loadIgnorePatterns(ignoreFlag string) ([]string, error) {
   var patterns []string
   if ignoreFlag != "" {
@@ -128,6 +162,9 @@ func shouldIgnore(path string, patterns []string) bool {
   return false
 }
 
+// -----------------------------
+// Scanner Core
+// -----------------------------
 func scanFile(path string, debug bool) ([]Finding, error) {
   if debug {
     log.Printf("Scanning file: %s", path)
@@ -181,9 +218,7 @@ func scanDir(ctx context.Context, root string, useGit, debug bool, ignorePattern
       if err != nil {
         return err
       }
-      if !d.IsDir() &&
-         supportedExtensions[filepath.Ext(path)] &&
-         !shouldIgnore(path, ignorePatterns) {
+      if !d.IsDir() && supportedExtensions[filepath.Ext(path)] && !shouldIgnore(path, ignorePatterns) {
         files = append(files, path)
       }
       return nil
@@ -202,6 +237,9 @@ func scanDir(ctx context.Context, root string, useGit, debug bool, ignorePattern
   return all, nil
 }
 
+// -----------------------------
+// Output and PR Commenting
+// -----------------------------
 func summarize(findings []Finding) {
   sev := map[string]int{}
   cat := map[string]int{}
@@ -248,30 +286,26 @@ func outputMarkdownBody(findings []Finding, verbose bool) string {
     catCount[f.Category]++
   }
   b.WriteString("---\n\n**Severity Summary**\n\n")
-  for _, lvl := range []string{"HIGH","MEDIUM","LOW"} {
+  for _, lvl := range []string{"HIGH", "MEDIUM", "LOW"} {
     if c, ok := sevCount[lvl]; ok {
       b.WriteString(fmt.Sprintf("- **%s**: %d\n", lvl, c))
     }
   }
   b.WriteString("\n**OWASP Category Summary**\n\n")
-  for _, cat := range []string{OWASP_A01,OWASP_A02,OWASP_A03,OWASP_A05,OWASP_A06,OWASP_A07,OWASP_A08,OWASP_A10} {
-    if c, ok := catCount[cat]; ok {
-      b.WriteString(fmt.Sprintf("- **%s**: %d\n", cat, c))
-    }
+  for cat, count := range catCount {
+    b.WriteString(fmt.Sprintf("- **%s**: %d\n", cat, count))
   }
   return b.String()
 }
 
 func postGitHubComment(body string) error {
   repo := os.Getenv("GITHUB_REPOSITORY")
-  pr   := os.Getenv("GITHUB_PR_NUMBER")
-  tok  := os.Getenv("GITHUB_TOKEN")
+  pr := os.Getenv("GITHUB_PR_NUMBER")
+  tok := os.Getenv("GITHUB_TOKEN")
   if repo == "" || pr == "" || tok == "" {
     return fmt.Errorf("GitHub environment variables not set")
   }
-  url := fmt.Sprintf(
-    "https://api.github.com/repos/%s/issues/%s/comments", repo, pr,
-  )
+  url := fmt.Sprintf("https://api.github.com/repos/%s/issues/%s/comments", repo, pr)
   payload := map[string]string{"body": body}
   data, _ := json.Marshal(payload)
   req, _ := http.NewRequest("POST", url, bytes.NewReader(data))
@@ -289,32 +323,32 @@ func postGitHubComment(body string) error {
   return nil
 }
 
+// -----------------------------
+// Main Entrypoint
+// -----------------------------
 func main() {
   flag.Usage = func() {
     fmt.Fprint(os.Stderr, "Static Code Scanner - OWASP-focused\n\n")
     flag.PrintDefaults()
   }
 
-  dir          := flag.String("dir", ".", "Directory to scan")
-  output       := flag.String("output", "text", "Output: text/json/markdown")
-  debug        := flag.Bool("debug", false, "Debug mode")
-  useGit       := flag.Bool("git-diff", false, "Scan changed files only")
-  exitHigh     := flag.Bool("exit-high", false, "Exit 1 if any HIGH findings")
-  ignoreFlag   := flag.String("ignore", "vendor,node_modules,dist,public,build",
-                      "Ignore patterns")
+  dir := flag.String("dir", ".", "Directory to scan")
+  output := flag.String("output", "text", "Output: text/json/markdown")
+  debug := flag.Bool("debug", false, "Debug mode")
+  useGit := flag.Bool("git-diff", false, "Scan changed files only")
+  exitHigh := flag.Bool("exit-high", false, "Exit 1 if any HIGH findings")
+  ignoreFlag := flag.String("ignore", "vendor,node_modules,dist,public,build", "Ignore patterns")
   postToGitHub := flag.Bool("github-pr", false, "Post results to GitHub PR")
-  verbose      := flag.Bool("verbose", false, "Show short remediation advice")
-  ruleFile     := flag.String("rules", "",
-                      "Path to external rules.json (overrides built-in)")
+  verbose := flag.Bool("verbose", false, "Show short remediation advice")
+  ruleFile := flag.String("rules", "", "Path to external rules.json (overrides built-in)")
   flag.Parse()
 
-  // 1) override built-in rules if json file provided
   if *ruleFile != "" {
     loaded, err := loadRulesFromFile(*ruleFile)
     if err != nil {
       log.Fatalf("failed to load rules from %s: %v", *ruleFile, err)
     }
-    rules   = loaded
+    rules = loaded
     ruleMap = make(map[string]Rule)
     for _, r := range rules {
       ruleMap[r.Name] = r
@@ -329,9 +363,7 @@ func main() {
     log.Fatalf("Failed to load ignore patterns: %v", err)
   }
 
-  findings, err := scanDir(
-    context.Background(), *dir, *useGit, *debug, ignorePatterns,
-  )
+  findings, err := scanDir(context.Background(), *dir, *useGit, *debug, ignorePatterns)
   if err != nil {
     log.Fatalf("Scan error: %v", err)
   }
@@ -343,9 +375,13 @@ func main() {
   summarize(findings)
   switch *output {
   case "text":
-    // … unchanged …
+    for _, f := range findings {
+      fmt.Printf("[%s] %s:%d - %s (%s)\n", f.Severity, f.File, f.Line, f.Match, f.Category)
+    }
   case "json":
-    // … unchanged …
+    enc := json.NewEncoder(os.Stdout)
+    enc.SetIndent("", "  ")
+    enc.Encode(findings)
   case "markdown":
     body := outputMarkdownBody(findings, *verbose)
     fmt.Println(body)
@@ -368,3 +404,4 @@ func main() {
     }
   }
 }
+

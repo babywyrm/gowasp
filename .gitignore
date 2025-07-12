@@ -1,0 +1,60 @@
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Output binaries
+/bin/
+/build/
+/dist/
+
+# Go modules
+/vendor/
+/go.sum
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+
+# Logs and dumps
+*.log
+*.bak
+*.tmp
+*.orig
+*.old
+*.DS_Store
+
+# Coverage
+*.coverprofile
+coverage.out
+
+# Test cache
+*.testresult
+*.prof
+
+# Generated files
+gen/
+*.pb.go
+*.pb.validate.go
+*.pb.gw.go
+
+# Local env/config
+.env
+.env.*
+.local
+*.local.yaml
+*.local.json
+
+# OS-specific
+Thumbs.db
+ehthumbs.db
+.DS_Store
+
