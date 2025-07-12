@@ -21,9 +21,6 @@ import (
   "github.com/bmatcuk/doublestar/v4"
 )
 
-// -----------------------------
-// Rule & Finding Structs
-// -----------------------------
 type Rule struct {
   Name        string
   Regex       string
@@ -48,12 +45,9 @@ var rules []Rule
 var ruleMap = map[string]Rule{}
 
 var supportedExtensions = map[string]bool{
-  ".go": true, ".js": true, ".py": true, ".java": true, ".html": true,
+  ".go": true, ".js": true, ".py": true, ".java": true, ".html": true, ".php": true,
 }
 
-// -----------------------------
-// InitRules() fallback
-// -----------------------------
 func InitRules() []Rule {
   return []Rule{
     {
@@ -68,9 +62,6 @@ func InitRules() []Rule {
   }
 }
 
-// -----------------------------
-// Load Rules from JSON file
-// -----------------------------
 func loadRulesFromFile(path string) ([]Rule, error) {
   data, err := ioutil.ReadFile(path)
   if err != nil {
@@ -110,9 +101,6 @@ func init() {
   }
 }
 
-// -----------------------------
-// Command Execution
-// -----------------------------
 func runCommand(ctx context.Context, cmd string, args ...string) (string, error) {
   c := exec.CommandContext(ctx, cmd, args...)
   out, err := c.CombinedOutput()
@@ -127,9 +115,6 @@ func getGitChangedFiles(ctx context.Context) ([]string, error) {
   return strings.Split(strings.TrimSpace(out), "\n"), nil
 }
 
-// -----------------------------
-// Ignore Patterns
-// -----------------------------
 func loadIgnorePatterns(ignoreFlag string) ([]string, error) {
   var patterns []string
   if ignoreFlag != "" {
@@ -162,9 +147,6 @@ func shouldIgnore(path string, patterns []string) bool {
   return false
 }
 
-// -----------------------------
-// Scanner Core
-// -----------------------------
 func scanFile(path string, debug bool) ([]Finding, error) {
   if debug {
     log.Printf("Scanning file: %s", path)
@@ -237,9 +219,6 @@ func scanDir(ctx context.Context, root string, useGit, debug bool, ignorePattern
   return all, nil
 }
 
-// -----------------------------
-// Output and PR Commenting
-// -----------------------------
 func summarize(findings []Finding) {
   sev := map[string]int{}
   cat := map[string]int{}
@@ -259,26 +238,19 @@ func summarize(findings []Finding) {
 
 func outputMarkdownBody(findings []Finding, verbose bool) string {
   var b strings.Builder
-  b.WriteString("### 🔍 Static Analysis Findings\n\n")
+  b.WriteString("### \ud83d\udd0d Static Analysis Findings\n\n")
   b.WriteString("| File | Line | Rule | Match | Severity | OWASP |\n")
   b.WriteString("|------|------|------|-------|----------|-------|\n")
   for _, f := range findings {
-    b.WriteString(fmt.Sprintf(
-      "| `%s` | %d | %s | `%s` | **%s** | %s |\n",
-      f.File, f.Line, f.RuleName, f.Match, f.Severity, f.Category,
-    ))
+    b.WriteString(fmt.Sprintf("| `%s` | %d | %s | `%s` | **%s** | %s |\n", f.File, f.Line, f.RuleName, f.Match, f.Severity, f.Category))
   }
   if verbose {
-    b.WriteString("\n---\n### 🛠 Remediation Brief\n\n")
+    b.WriteString("\n---\n### \ud83d\udee0 Remediation Brief\n\n")
     for _, f := range findings {
       r := ruleMap[f.RuleName]
-      b.WriteString(fmt.Sprintf(
-        "- **%s:%d** – %s\n    - %s\n\n",
-        f.File, f.Line, r.Name, r.Remediation,
-      ))
+      b.WriteString(fmt.Sprintf("- **%s:%d** – %s\n    - %s\n\n", f.File, f.Line, r.Name, r.Remediation))
     }
   }
-  // summary
   sevCount := map[string]int{}
   catCount := map[string]int{}
   for _, f := range findings {
@@ -323,15 +295,7 @@ func postGitHubComment(body string) error {
   return nil
 }
 
-// -----------------------------
-// Main Entrypoint
-// -----------------------------
 func main() {
-  flag.Usage = func() {
-    fmt.Fprint(os.Stderr, "Static Code Scanner - OWASP-focused\n\n")
-    flag.PrintDefaults()
-  }
-
   dir := flag.String("dir", ".", "Directory to scan")
   output := flag.String("output", "text", "Output: text/json/markdown")
   debug := flag.Bool("debug", false, "Debug mode")
@@ -343,10 +307,20 @@ func main() {
   ruleFile := flag.String("rules", "", "Path to external rules.json (overrides built-in)")
   flag.Parse()
 
-  if *ruleFile != "" {
-    loaded, err := loadRulesFromFile(*ruleFile)
+  rulePath := *ruleFile
+  if rulePath == "" {
+    if _, err := os.Stat("rules.json"); err == nil {
+      rulePath = "rules.json"
+      if *debug {
+        log.Println("No rules file passed, using rules.json from current directory")
+      }
+    }
+  }
+
+  if rulePath != "" {
+    loaded, err := loadRulesFromFile(rulePath)
     if err != nil {
-      log.Fatalf("failed to load rules from %s: %v", *ruleFile, err)
+      log.Fatalf("failed to load rules from %s: %v", rulePath, err)
     }
     rules = loaded
     ruleMap = make(map[string]Rule)
