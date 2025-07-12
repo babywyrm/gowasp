@@ -50,9 +50,10 @@ var supportedExtensions = map[string]bool{
 
 // Severity levels in order (highest to lowest)
 var severityLevels = map[string]int{
-  "HIGH":   3,
-  "MEDIUM": 2,
-  "LOW":    1,
+  "CRITICAL": 4,
+  "HIGH":     3,
+  "MEDIUM":   2,
+  "LOW":      1,
 }
 
 func InitRules() []Rule {
@@ -200,10 +201,25 @@ func scanFile(path string, debug bool) ([]Finding, error) {
   defer f.Close()
 
   scanner := bufio.NewScanner(f)
+
+  // Fix: Increase the scanner buffer size to handle large lines
+  const maxCapacity = 1024 * 1024 * 10 // 10MB buffer
+  buf := make([]byte, 0, 64*1024)       // Initial 64KB buffer
+  scanner.Buffer(buf, maxCapacity)
+
   lineNum := 0
   for scanner.Scan() {
     lineNum++
     text := scanner.Text()
+
+    // Skip extremely long lines for performance
+    if len(text) > 100000 { // Skip lines longer than 100KB
+      if debug {
+        log.Printf("Skipping very long line %d in %s (length: %d)", lineNum, path, len(text))
+      }
+      continue
+    }
+
     for _, r := range rules {
       if r.Pattern.MatchString(text) {
         match := r.Pattern.FindString(text)
@@ -222,7 +238,17 @@ func scanFile(path string, debug bool) ([]Finding, error) {
       }
     }
   }
-  return findings, scanner.Err()
+
+  // Handle scanner errors more gracefully
+  if err := scanner.Err(); err != nil {
+    if debug {
+      log.Printf("Scanner error for %s: %v", path, err)
+    }
+    // Don't fail completely, just log and continue
+    return findings, nil
+  }
+
+  return findings, nil
 }
 
 func scanDir(ctx context.Context, root string, useGit, debug bool, ignorePatterns []string) ([]Finding, error) {
@@ -299,7 +325,7 @@ func outputMarkdownBody(findings []Finding, verbose bool) string {
     catCount[f.Category]++
   }
   b.WriteString("---\n\n**Severity Summary**\n\n")
-  for _, lvl := range []string{"HIGH", "MEDIUM", "LOW"} {
+  for _, lvl := range []string{"CRITICAL", "HIGH", "MEDIUM", "LOW"} {
     if c, ok := sevCount[lvl]; ok {
       b.WriteString(fmt.Sprintf("- **%s**: %d\n", lvl, c))
     }
@@ -346,13 +372,13 @@ func main() {
   postToGitHub := flag.Bool("github-pr", false, "Post results to GitHub PR")
   verbose := flag.Bool("verbose", false, "Show short remediation advice")
   ruleFile := flag.String("rules", "", "Path to external rules.json (overrides built-in)")
-  minSeverity := flag.String("min-severity", "", "Minimum severity to show (HIGH, MEDIUM, LOW)")
+  minSeverity := flag.String("severity", "", "Minimum severity to show (CRITICAL, HIGH, MEDIUM, LOW)")
   flag.Parse()
 
   // Validate severity flag
   if *minSeverity != "" {
     if _, exists := severityLevels[*minSeverity]; !exists {
-      log.Fatalf("Invalid severity level: %s. Valid options: HIGH, MEDIUM, LOW", *minSeverity)
+      log.Fatalf("Invalid severity level: %s. Valid options: CRITICAL, HIGH, MEDIUM, LOW", *minSeverity)
     }
   }
 
@@ -381,7 +407,7 @@ func main() {
   if *debug {
     log.Println("Debug mode enabled")
     if *minSeverity != "" {
-      log.Printf("Filtering for minimum severity: %s", *minSeverity)
+      log.Printf("Filtering for minimum severity: %s and above", *minSeverity)
     }
   }
   ignorePatterns, err := loadIgnorePatterns(*ignoreFlag)
@@ -407,7 +433,7 @@ func main() {
   }
 
   if *minSeverity != "" {
-    fmt.Printf("Showing findings with minimum severity: %s\n", *minSeverity)
+    fmt.Printf("Showing findings with minimum severity: %s and above\n", *minSeverity)
     fmt.Printf("Found %d findings (filtered from %d total)\n", len(findings), len(allFindings))
   }
 
