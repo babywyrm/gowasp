@@ -48,6 +48,13 @@ var supportedExtensions = map[string]bool{
   ".go": true, ".js": true, ".py": true, ".java": true, ".html": true, ".php": true,
 }
 
+// Severity levels in order (highest to lowest)
+var severityLevels = map[string]int{
+  "HIGH":   3,
+  "MEDIUM": 2,
+  "LOW":    1,
+}
+
 func InitRules() []Rule {
   return []Rule{
     {
@@ -99,6 +106,40 @@ func init() {
   for _, r := range rules {
     ruleMap[r.Name] = r
   }
+}
+
+// Check if a finding's severity meets the minimum threshold
+func meetsSeverityThreshold(findingSeverity, minSeverity string) bool {
+  if minSeverity == "" {
+    return true // No filter, show all
+  }
+
+  findingLevel, exists := severityLevels[findingSeverity]
+  if !exists {
+    return true // Unknown severity, include by default
+  }
+
+  minLevel, exists := severityLevels[minSeverity]
+  if !exists {
+    return true // Unknown min severity, include by default
+  }
+
+  return findingLevel >= minLevel
+}
+
+// Filter findings by minimum severity
+func filterBySeverity(findings []Finding, minSeverity string) []Finding {
+  if minSeverity == "" {
+    return findings
+  }
+
+  var filtered []Finding
+  for _, f := range findings {
+    if meetsSeverityThreshold(f.Severity, minSeverity) {
+      filtered = append(filtered, f)
+    }
+  }
+  return filtered
 }
 
 func runCommand(ctx context.Context, cmd string, args ...string) (string, error) {
@@ -238,14 +279,14 @@ func summarize(findings []Finding) {
 
 func outputMarkdownBody(findings []Finding, verbose bool) string {
   var b strings.Builder
-  b.WriteString("### \ud83d\udd0d Static Analysis Findings\n\n")
+  b.WriteString("### 🔍 Static Analysis Findings\n\n")
   b.WriteString("| File | Line | Rule | Match | Severity | OWASP |\n")
   b.WriteString("|------|------|------|-------|----------|-------|\n")
   for _, f := range findings {
     b.WriteString(fmt.Sprintf("| `%s` | %d | %s | `%s` | **%s** | %s |\n", f.File, f.Line, f.RuleName, f.Match, f.Severity, f.Category))
   }
   if verbose {
-    b.WriteString("\n---\n### \ud83d\udee0 Remediation Brief\n\n")
+    b.WriteString("\n---\n### 🛠 Remediation Brief\n\n")
     for _, f := range findings {
       r := ruleMap[f.RuleName]
       b.WriteString(fmt.Sprintf("- **%s:%d** – %s\n    - %s\n\n", f.File, f.Line, r.Name, r.Remediation))
@@ -305,7 +346,15 @@ func main() {
   postToGitHub := flag.Bool("github-pr", false, "Post results to GitHub PR")
   verbose := flag.Bool("verbose", false, "Show short remediation advice")
   ruleFile := flag.String("rules", "", "Path to external rules.json (overrides built-in)")
+  minSeverity := flag.String("min-severity", "", "Minimum severity to show (HIGH, MEDIUM, LOW)")
   flag.Parse()
+
+  // Validate severity flag
+  if *minSeverity != "" {
+    if _, exists := severityLevels[*minSeverity]; !exists {
+      log.Fatalf("Invalid severity level: %s. Valid options: HIGH, MEDIUM, LOW", *minSeverity)
+    }
+  }
 
   rulePath := *ruleFile
   if rulePath == "" {
@@ -331,19 +380,35 @@ func main() {
 
   if *debug {
     log.Println("Debug mode enabled")
+    if *minSeverity != "" {
+      log.Printf("Filtering for minimum severity: %s", *minSeverity)
+    }
   }
   ignorePatterns, err := loadIgnorePatterns(*ignoreFlag)
   if err != nil {
     log.Fatalf("Failed to load ignore patterns: %v", err)
   }
 
-  findings, err := scanDir(context.Background(), *dir, *useGit, *debug, ignorePatterns)
+  allFindings, err := scanDir(context.Background(), *dir, *useGit, *debug, ignorePatterns)
   if err != nil {
     log.Fatalf("Scan error: %v", err)
   }
+
+  // Apply severity filter
+  findings := filterBySeverity(allFindings, *minSeverity)
+
   if len(findings) == 0 {
-    fmt.Println("✅ No issues found.")
+    if *minSeverity != "" && len(allFindings) > 0 {
+      fmt.Printf("✅ No issues found at %s severity or above.\n", *minSeverity)
+    } else {
+      fmt.Println("✅ No issues found.")
+    }
     return
+  }
+
+  if *minSeverity != "" {
+    fmt.Printf("Showing findings with minimum severity: %s\n", *minSeverity)
+    fmt.Printf("Found %d findings (filtered from %d total)\n", len(findings), len(allFindings))
   }
 
   summarize(findings)
@@ -378,4 +443,3 @@ func main() {
     }
   }
 }
-
