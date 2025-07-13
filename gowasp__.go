@@ -46,16 +46,35 @@ var rules []Rule
 var ruleMap = map[string]Rule{}
 
 var supportedExtensions = map[string]bool{
-  ".go": true, ".js": true, ".py": true,
-  ".java": true, ".html": true, ".php": true,
+  ".go": true, ".js": true, ".py": true, ".java": true, ".html": true, ".php": true,
 }
 
-// Severity levels (highest first)
 var severityLevels = map[string]int{
   "CRITICAL": 4,
   "HIGH":     3,
   "MEDIUM":   2,
   "LOW":      1,
+}
+
+// Config holds CLI flag values.
+type Config struct {
+  Dir         string
+  RuleFiles   []string
+  MinSeverity string
+  IgnoreGlobs []string
+  UseGitDiff  bool
+  Output      string
+  Debug       bool
+  ExitHigh    bool
+  PostToPR    bool
+  Verbose     bool
+}
+
+// check fatals on error.
+func check(err error, msg string) {
+  if err != nil {
+    log.Fatalf("%s: %v", msg, err)
+  }
 }
 
 func InitRules() []Rule {
@@ -78,12 +97,7 @@ func loadRulesFromFile(path string) ([]Rule, error) {
     return nil, err
   }
   var jr []struct {
-    Name        string `json:"name"`
-    Pattern     string `json:"pattern"`
-    Severity    string `json:"severity"`
-    Category    string `json:"category"`
-    Description string `json:"description"`
-    Remediation string `json:"remediation"`
+    Name, Pattern, Severity, Category, Description, Remediation string
   }
   if err := json.Unmarshal(data, &jr); err != nil {
     return nil, fmt.Errorf("invalid JSON in %s: %w", path, err)
@@ -92,10 +106,8 @@ func loadRulesFromFile(path string) ([]Rule, error) {
   for i, r := range jr {
     re, err := regexp.Compile(r.Pattern)
     if err != nil {
-      return nil, fmt.Errorf(
-        "failed to compile regex for rule %q in %s[%d]: %v",
-        r.Name, path, i, err,
-      )
+      return nil, fmt.Errorf("regex compile error for %q in %s[%d]: %v",
+        r.Name, path, i, err)
     }
     out[i] = Rule{
       Name:        r.Name,
@@ -110,25 +122,25 @@ func loadRulesFromFile(path string) ([]Rule, error) {
   return out, nil
 }
 
-func meetsThreshold(findingSeverity, minSeverity string) bool {
-  if minSeverity == "" {
+func meetsThreshold(fsev, minsev string) bool {
+  if minsev == "" {
     return true
   }
-  fl, ok1 := severityLevels[findingSeverity]
-  ml, ok2 := severityLevels[minSeverity]
+  fl, ok1 := severityLevels[fsev]
+  ml, ok2 := severityLevels[minsev]
   if !ok1 || !ok2 {
     return true
   }
   return fl >= ml
 }
 
-func filterBySeverity(findings []Finding, minSeverity string) []Finding {
-  if minSeverity == "" {
+func filterBySeverity(findings []Finding, minsev string) []Finding {
+  if minsev == "" {
     return findings
   }
   var out []Finding
   for _, f := range findings {
-    if meetsThreshold(f.Severity, minSeverity) {
+    if meetsThreshold(f.Severity, minsev) {
       out = append(out, f)
     }
   }
@@ -141,15 +153,12 @@ func runCommand(ctx context.Context, cmd string, args ...string) (string, error)
   return string(out), err
 }
 
-func loadIgnorePatterns(ignoreFlag string) ([]string, error) {
+func loadIgnorePatterns(ignoreFlag string) []string {
   pats := []string{}
   if ignoreFlag != "" {
     pats = append(pats, strings.Split(ignoreFlag, ",")...)
   }
   f, err := os.Open(".scannerignore")
-  if err != nil && !os.IsNotExist(err) {
-    return nil, err
-  }
   if err == nil {
     defer f.Close()
     sc := bufio.NewScanner(f)
@@ -160,7 +169,7 @@ func loadIgnorePatterns(ignoreFlag string) ([]string, error) {
       }
     }
   }
-  return pats, nil
+  return pats
 }
 
 func shouldIgnore(path string, patterns []string) bool {
@@ -174,7 +183,7 @@ func shouldIgnore(path string, patterns []string) bool {
 
 func scanFile(path string, debug bool) []Finding {
   if debug {
-    log.Printf("Scanning file: %s", path)
+    log.Printf("Scanning %s", path)
   }
   var findings []Finding
   f, err := os.Open(path)
@@ -217,24 +226,26 @@ func scanFile(path string, debug bool) []Finding {
   return findings
 }
 
-func scanDir(ctx context.Context, root string, useGit, debug bool, ignorePatterns []string) ([]Finding, error) {
-  if debug {
-    log.Printf("Starting scan in %s (git=%v)", root, useGit)
+func scanDir(ctx context.Context, cfg Config) ([]Finding, error) {
+  if cfg.Debug {
+    log.Printf("Starting scan dir=%s gitDiff=%v", cfg.Dir, cfg.UseGitDiff)
   }
   var files []string
-  if useGit {
+  if cfg.UseGitDiff {
     out, err := runCommand(ctx, "git", "diff", "--name-only", "HEAD~1")
     if err != nil {
       return nil, err
     }
     files = strings.Split(strings.TrimSpace(out), "\n")
   } else {
-    filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+    ignorePatterns := loadIgnorePatterns(strings.Join(cfg.IgnoreGlobs, ","))
+    filepath.WalkDir(cfg.Dir, func(p string, d os.DirEntry, err error) error {
       if err != nil {
         return err
       }
-      if !d.IsDir() && supportedExtensions[filepath.Ext(path)] && !shouldIgnore(path, ignorePatterns) {
-        files = append(files, path)
+      if !d.IsDir() && supportedExtensions[filepath.Ext(p)] &&
+        !shouldIgnore(p, ignorePatterns) {
+        files = append(files, p)
       }
       return nil
     })
@@ -242,15 +253,13 @@ func scanDir(ctx context.Context, root string, useGit, debug bool, ignorePattern
 
   var all []Finding
   for _, p := range files {
-    fs := scanFile(p, debug)
-    all = append(all, fs...)
+    all = append(all, scanFile(p, cfg.Debug)...)
   }
   return all, nil
 }
 
 func summarize(findings []Finding) {
-  sev := map[string]int{}
-  cat := map[string]int{}
+  sev, cat := map[string]int{}, map[string]int{}
   for _, f := range findings {
     sev[f.Severity]++
     cat[f.Category]++
@@ -271,7 +280,7 @@ func spinner(stop chan struct{}) {
   for {
     select {
     case <-stop:
-      fmt.Fprint(os.Stderr, "\r") // clear
+      fmt.Fprint(os.Stderr, "\r")
       return
     default:
       fmt.Fprintf(os.Stderr, "\r%s Scanning...", string(frames[i%len(frames)]))
@@ -305,7 +314,7 @@ func outputMarkdownBody(findings []Finding, verbose bool) string {
     sevCount[f.Severity]++
     catCount[f.Category]++
   }
-  for _, lvl := range []string{"CRITICAL", "HIGH", "MEDIUM", "LOW"} {
+  for _, lvl := range []string{"CRITICAL","HIGH","MEDIUM","LOW"} {
     if c, ok := sevCount[lvl]; ok {
       b.WriteString(fmt.Sprintf("- **%s**: %d\n", lvl, c))
     }
@@ -342,60 +351,57 @@ func postGitHubComment(body string) error {
 }
 
 func main() {
-  dir := flag.String("dir", ".", "Directory to scan")
-  rulesFlag := flag.String("rules", "", "Comma-separated rule JSON files")
-  minSeverity := flag.String("severity", "", "Min severity: CRITICAL,HIGH,MEDIUM,LOW")
-  ignoreFlag := flag.String("ignore", "vendor,node_modules,dist,public,build", "Ignore patterns")
-  output := flag.String("output", "text", "text/json/markdown")
-  debug := flag.Bool("debug", false, "Debug mode")
-  useGit := flag.Bool("git-diff", false, "Scan changed files only")
-  exitHigh := flag.Bool("exit-high", false, "Exit on HIGH")
-  postPR := flag.Bool("github-pr", false, "Post to GitHub PR")
-  verbose := flag.Bool("verbose", false, "Show remediation")
+  var cfg Config
+  var rulesFlag, ignoreFlag string
+
+  flag.StringVar(&cfg.Dir, "dir", ".", "Directory to scan")
+  flag.StringVar(&rulesFlag, "rules", "", "Comma-separated rule JSON files")
+  flag.StringVar(&cfg.MinSeverity, "severity", "", "Min severity: CRITICAL,HIGH,MEDIUM,LOW")
+  flag.StringVar(&ignoreFlag, "ignore", "vendor,node_modules,dist,public,build", "Ignore patterns")
+  flag.StringVar(&cfg.Output, "output", "text", "text/json/markdown")
+  flag.BoolVar(&cfg.Debug, "debug", false, "Debug mode")
+  flag.BoolVar(&cfg.UseGitDiff, "git-diff", false, "Scan only git diff")
+  flag.BoolVar(&cfg.ExitHigh, "exit-high", false, "Exit on HIGH findings")
+  flag.BoolVar(&cfg.PostToPR, "github-pr", false, "Post to GitHub PR")
+  flag.BoolVar(&cfg.Verbose, "verbose", false, "Show remediation")
   flag.Parse()
 
-  // Load rules
-  rules = InitRules()
-  if *rulesFlag != "" {
-    for _, rf := range strings.Split(*rulesFlag, ",") {
-      loaded, err := loadRulesFromFile(rf)
-      if err != nil {
-        log.Fatalf("loading %s: %v", rf, err)
-      }
-      rules = append(rules, loaded...)
-    }
+  if rulesFlag != "" {
+    cfg.RuleFiles = strings.Split(rulesFlag, ",")
   } else if _, err := os.Stat("rules.json"); err == nil {
-    loaded, err := loadRulesFromFile("rules.json")
-    if err != nil {
-      log.Fatalf("loading rules.json: %v", err)
+    cfg.RuleFiles = []string{"rules.json"}
+    if cfg.Debug {
+      log.Println("Using default rules.json")
     }
-    rules = append(rules, loaded...)
+  }
+  cfg.IgnoreGlobs = strings.Split(ignoreFlag, ",")
+
+  if cfg.MinSeverity != "" {
+    if _, ok := severityLevels[cfg.MinSeverity]; !ok {
+      log.Fatalf("Invalid severity: %s", cfg.MinSeverity)
+    }
+  }
+
+  rules = InitRules()
+  for _, rf := range cfg.RuleFiles {
+    rl, err := loadRulesFromFile(rf)
+    check(err, "loading "+rf)
+    rules = append(rules, rl...)
   }
   ruleMap = make(map[string]Rule)
   for _, r := range rules {
     ruleMap[r.Name] = r
   }
 
-  // Prepare ignore patterns
-  ignores, err := loadIgnorePatterns(*ignoreFlag)
-  if err != nil {
-    log.Fatalf("loading ignore patterns: %v", err)
-  }
-
-  // Start spinner
   stop := make(chan struct{})
   go spinner(stop)
 
-  // Scan
-  allFindings, err := scanDir(context.Background(), *dir, *useGit, *debug, ignores)
+  allFindings, err := scanDir(context.Background(), cfg)
   close(stop)
   fmt.Fprintln(os.Stderr)
-  if err != nil {
-    log.Fatalf("scan error: %v", err)
-  }
+  check(err, "scanDir")
 
-  // Filter and sort
-  findings := filterBySeverity(allFindings, *minSeverity)
+  findings := filterBySeverity(allFindings, cfg.MinSeverity)
   sort.Slice(findings, func(i, j int) bool {
     si := severityLevels[findings[i].Severity]
     sj := severityLevels[findings[j].Severity]
@@ -415,11 +421,10 @@ func main() {
     fmt.Println("✅ No issues found.")
     return
   }
-
-  fmt.Printf("Showing findings >= %s (total %d)\n\n", *minSeverity, len(findings))
+  fmt.Printf("Showing findings ≥%s (total %d)\n\n", cfg.MinSeverity, len(findings))
   summarize(findings)
 
-  switch *output {
+  switch cfg.Output {
   case "text":
     for _, f := range findings {
       fmt.Printf("[%s] %s:%d - %s (%s)\n",
@@ -430,20 +435,17 @@ func main() {
     enc.SetIndent("", "  ")
     enc.Encode(findings)
   case "markdown":
-    body := outputMarkdownBody(findings, *verbose)
+    body := outputMarkdownBody(findings, cfg.Verbose)
     fmt.Println(body)
-    if *postPR {
-      if err := postGitHubComment(body); err != nil {
-        log.Printf("GitHub comment failed: %v", err)
-      } else {
-        fmt.Println("✅ Comment posted.")
-      }
+    if cfg.PostToPR {
+      check(postGitHubComment(body), "postGitHubComment")
+      fmt.Println("✅ Comment posted.")
     }
   default:
-    log.Fatalf("Unsupported output: %s", *output)
+    log.Fatalf("Unsupported output: %s", cfg.Output)
   }
 
-  if *exitHigh {
+  if cfg.ExitHigh {
     for _, f := range findings {
       if f.Severity == "HIGH" {
         os.Exit(1)
