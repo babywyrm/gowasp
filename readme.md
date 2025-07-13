@@ -1,174 +1,188 @@
 # OWASP Scanner (Beta)
 
-The OWASP Scanner is a lightweight, multi-language static analysis tool that detects common OWASP Top 10 security issues in your source code.  
-It supports Go, JavaScript, Python, Java, PHP, HTML, and more.
-
-It can output results in plain text, JSON, or Markdown formats, integrate with CI/CD (failing builds on HIGH severity), and even post scan results as comments on GitHub pull requests.
+The OWASP Scanner is a lightweight, multi-language static analysis tool that detects OWASP Top 10 security issues—and more—in your source code.  
+It supports Go, JS, Python, Java, PHP, HTML, and can output in text, JSON, or Markdown. Integrates with CI/CD, fails on HIGH severity, and can comment on GitHub PRs.
 
 ---
 
 ## Features
 
 - Multi-language scanning (Go, JS, Python, Java, HTML, PHP…)  
-- OWASP Top 10 rule set (Injection, Auth failures, Insecure configs, etc.)  
-- Severity filtering with `--severity` (CRITICAL, HIGH, MEDIUM, LOW)
-- Load custom rules via `rules.json` (see `--rules`)  
+- OWASP Top 10 rule set with CRITICAL/HIGH/MEDIUM/LOW severities  
+- Custom rules via JSON:  
+  - **rules_core.json** (OWASP‐focused)  
+  - **rules_infra.json** (infra, cloud & container checks)  
+- `--rules` accepts comma-separated list of JSON files  
 - Git diff scanning (`--git-diff`), ignore globs (`--ignore`)  
-- Output formats: `text`, `json`, `markdown`  
-- Remediation advice with `--verbose`  
-- CI/CD-safe: `--exit-high` to fail builds  
-- GitHub PR comment support with `--github-pr`
-- Large file handling (up to 10MB lines, skips 100KB+ lines)
+- Output: text, JSON, Markdown (`--output`)  
+- Remediation hints (`--verbose`)  
+- CI/CD safe: `--exit-high`  
+- GitHub PR comments (`--github-pr`)  
+- Handles large files (10 MB buffer, skips lines >100 KB)  
 
 ---
 
 ## Installation
 
-1. **Clone the project**
-   ```bash
-   git clone https://github.com/babywyrm/gowasp.git
-   cd gowasp/gowasp
-   ```
+```bash
+git clone https://github.com/babywyrm/gowasp.git
+cd gowasp/gowasp
 
-2. **(Optional) Generate `rules.json` from built-ins**
-   ```bash
-   go run gen_rule_json.go rules.go > rules.json
-   ```
+# (Optional) generate default rules.json
+go run gen_rule_json.go rules.go > rules.json
 
-3. **Build the binary**
-   ```bash
-   go build -o scanner gowasp.go
-   ```
+# Build
+go build -o scanner gowasp.go
+```
 
 ---
 
 ## Usage
 
-Run `./scanner --help` for full flag details.
+```
+./scanner --help
+```
 
-| Flag          | Description                                      |
-| ------------- | ------------------------------------------------ |
-| `--dir`       | Directory to scan (default: `.`)                |
-| `--rules`     | Path to custom `rules.json`                     |
-| `--severity`  | Minimum severity to show (CRITICAL, HIGH, MEDIUM, LOW) |
-| `--ignore`    | Comma-separated glob patterns to skip           |
-| `--git-diff`  | Scan only files changed in last commit          |
-| `--output`    | Output format: `text`, `json`, `markdown`       |
-| `--verbose`   | Show remediation advice in output               |
-| `--exit-high` | Exit code 1 if any HIGH severity is found       |
-| `--github-pr` | Post Markdown report to GitHub PR comment       |
-| `--debug`     | Enable internal logging                         |
+| Flag         | Description                                     |
+| ------------ | ----------------------------------------------- |
+| `--dir`      | Directory to scan (default `.`)                 |
+| `--rules`    | Comma-separated JSON rule files                 |
+| `--severity` | Minimum severity: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW` |
+| `--ignore`   | Comma-separated glob patterns to skip           |
+| `--git-diff` | Scan only files changed in last commit          |
+| `--output`   | `text`, `json`, `markdown`                      |
+| `--verbose`  | Show remediation advice                         |
+| `--exit-high`| Exit code 1 if any HIGH found                   |
+| `--github-pr`| Post Markdown report to GitHub PR               |
+| `--debug`    | Enable internal logging                         |
+
+### Multiple Rule Files
+
+Point at both core and infra rule sets:
+
+```bash
+./scanner \
+  --rules=rules/rules_core.json,rules/rules_infra.json \
+  --dir ./src \
+  --severity HIGH \
+  --output markdown
+```
 
 ---
 
-## Basic Examples
+## Examples
 
-### 🔍 Quick Scan
+### Basic
+
 ```bash
 ./scanner --dir . --output text
-```
-
-### 🎯 High Severity Only
-```bash
 ./scanner --dir . --severity HIGH --output markdown
+./scanner --git-diff --severity MEDIUM --output text
 ```
 
-### 📊 Medium and Above with Summary
+### Custom Rules
+
 ```bash
-./scanner --dir . --severity MEDIUM --output markdown --verbose
+./scanner --rules=rules/custom_rules.json --dir ./src --severity CRITICAL
 ```
 
-### 🔃 Scan Only Git Changes
+### DVWA
+
 ```bash
-./scanner --git-diff --severity HIGH --output markdown
-```
-
----
-
-## Advanced Scanning Strategies
-
-### 🎯 Focus on Application Code (Reduce Noise)
-
-**Scan specific directories:**
-```bash
-# Scan just API/application code
-./scanner --dir ./src/api --severity HIGH --output markdown
-
-# Skip test and vendor files
-./scanner --dir . --severity HIGH --ignore "vendor/**,**/tests/**,**/test/**,node_modules/**"
-```
-
-** Yes, Examples: DVWA Scanning 
-```bash
-# Noisy: Full DVWA scan (178 findings)
+# Noisy: full DVWA (~178 findings)
 ./scanner --dir ../../dvwa --severity MEDIUM --output markdown
 
-# Better: Skip demo/help files (83 findings)  
-./scanner --dir ../../dvwa --severity MEDIUM --output markdown \
+# Better: skip demos (~83 findings)
+./scanner \
+  --dir ../../dvwa --severity MEDIUM --output markdown \
   --ignore "vendor,node_modules,**/help/**,**/source/**,setup.php,test*.php,**/tests/**"
 
-# Best: Focus on real application code (11 findings)
-./scanner --dir ../../dvwa/vulnerabilities/api --severity HIGH --output markdown
-
-
-** Another Example: WebGoat Scanning 
-
-```bash
-# Noisy: Full WebGoat scan (391 findings)
-./scanner --dir ../../WebGoat --severity HIGH --output markdown
-
-# Better: Skip integration tests, unit tests & static assets (~100 findings)
-./scanner --dir ../../WebGoat --severity HIGH --output markdown \
-  --ignore "src/it/**,src/test/**,**/static/**,**/resources/**"
-
-# Best: Focus on core lesson code (~20 findings)
-./scanner --dir ../../WebGoat/src/main/java/org/owasp/webgoat/lessons \
+# Best: only app code (11 findings)
+./scanner \
+  --dir ../../dvwa/vulnerabilities/api \
   --severity HIGH --output markdown
 ```
 
+### WebGoat
 
+```bash
+# Noisy: full WebGoat (~391 findings)
+./scanner --dir ../../WebGoat --severity HIGH --output markdown
+
+# Better: skip tests/assets (~100 findings)
+./scanner \
+  --dir ../../WebGoat --severity HIGH --output markdown \
+  --ignore "src/it/**,src/test/**,**/static/**,**/resources/**"
+
+# Best: core lessons (~20 findings)
+./scanner \
+  --dir ../../WebGoat/src/main/java/org/owasp/webgoat/lessons \
+  --severity HIGH --output markdown
 ```
 
-### 📁 Using .scannerignore File
+### Infra Rules Only
 
-Create a `.scannerignore` file in your project root:
 ```bash
-# Framework/vendor files
+./scanner \
+  --rules=rules/rules_infra.json \
+  --dir ./deploy \
+  --severity HIGH --output markdown
+```
+
+### Combined Core + Infra
+
+```bash
+./scanner \
+  --rules=rules/rules_core.json,rules/rules_infra.json \
+  --dir ./deploy \
+  --severity HIGH --output markdown
+```
+
+---
+
+## Using `.scannerignore`
+
+Create `.scannerignore` in project root:
+
+```
 vendor/**
 node_modules/**
-**/tests/**
-**/test/**
-
-# Generated files
 dist/**
 build/**
 public/**
-
-# Demo/help files  
+**/tests/**
 **/help/**
 **/source/**
-**/docs/**
-setup.php
-install.php
 ```
 
-Then scan normally:
+Then run:
+
 ```bash
-./scanner --dir . --severity HIGH --output markdown
+./scanner --ignore= --dir . --severity HIGH --output markdown
 ```
 
-### 🏗️ CI/CD Integration
+---
 
-**Fail builds on HIGH findings:**
+## CI/CD Integration
+
+**Exit on HIGH**:
+
 ```bash
 ./scanner --dir . --severity HIGH --exit-high
 ```
 
-**GitHub Actions example:**
+**GitHub Actions**:
+
 ```yaml
-- name: Security Scan
+- name: Static Analysis
   run: |
-    ./scanner --dir . --severity HIGH --output markdown --github-pr --verbose
+    ./scanner \
+      --rules=rules/rules_core.json,rules/rules_infra.json \
+      --dir . \
+      --severity HIGH \
+      --output markdown \
+      --github-pr \
+      --verbose
   env:
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     GITHUB_REPOSITORY: ${{ github.repository }}
@@ -177,115 +191,11 @@ Then scan normally:
 
 ---
 
-## Real-World Examples
+## Tips
 
-### 🎯 Production Application Scan
-```bash
-# Focus on source code, ignore noise
-./scanner --dir ./src --severity HIGH --output markdown \
-  --ignore "vendor/**,node_modules/**,**/tests/**,dist/**" \
-  --verbose
-```
+1. Start with `--severity HIGH`  
+2. Use `--ignore` or `.scannerignore` to reduce noise  
+3. Target specific dirs (`--dir`) for focused scans  
+4. Combine with `--git-diff` in dev workflows  
+5. Split rules into core/infra for modularity  
 
-### 🔍 Development Workflow
-```bash
-# Quick check of changed files
-./scanner --git-diff --severity MEDIUM --output text
-
-# Detailed analysis before commit
-./scanner --git-diff --severity HIGH --output markdown --verbose
-```
-
-### 📈 Security Review
-```bash
-# Complete scan with all findings
-./scanner --dir . --severity LOW --output json > security-report.json
-
-# Executive summary
-./scanner --dir . --severity HIGH --output markdown --verbose
-```
-
----
-
-## Sample Output
-
-### Real Application (API Focus)
-````markdown
-### 🔍 Static Analysis Findings
-
-| File | Line | Rule | Match | Severity | OWASP |
-|------|------|------|-------|----------|-------|
-| `src/Login.php` | 10 | API Key | `SECRET = "12345"` | **HIGH** | A02 |
-| `src/HealthController.php` | 88 | Command Exec | `exec (` | **HIGH** | A03 |
-| `js/auth.js` | 43 | innerHTML | `.innerHTML =` | **HIGH** | A07 |
-
-**Severity Summary**
-- **HIGH**: 3
-
-**OWASP Category Summary**  
-- **A02**: 1
-- **A03**: 1
-- **A07**: 1
-```
-
-### Noisy Scan (Too Many False Positives)
-```bash
-# This will find 178 findings, mostly noise:
-./scanner --dir ../../dvwa --severity LOW --output text
-
-# Better approach:
-./scanner --dir ../../dvwa/vulnerabilities/api --severity HIGH --output markdown
-# Results: 11 focused, actionable findings
-```
-
----
-
-## 🧪 GitHub PR Comment Integration
-
-Set the following environment variables in your GitHub Actions or CI/CD pipeline:
-
-```bash
-export GITHUB_REPOSITORY="babywyrm/gowasp"
-export GITHUB_PR_NUMBER="42"
-export GITHUB_TOKEN="ghp_..."  # must have `repo` scope
-```
-
-Then run:
-```bash
-./scanner --rules=rules.json --output markdown --github-pr --verbose
-```
-
----
-
-## Tips for Effective Scanning
-
-1. **Start with HIGH severity** to avoid noise
-2. **Use directory targeting** (`--dir ./src/api`) for focused results  
-3. **Ignore test/vendor files** to reduce false positives
-4. **Use .scannerignore** for consistent exclusions across team
-5. **Combine with git-diff** for efficient development workflow
-6. **Tune rules.json** for your specific tech stack
-
----
-
-## Custom Rules
-
-Create a `rules.json` file to override built-in rules:
-
-```json
-[
-  {
-    "name": "Hardcoded API Key",
-    "pattern": "(?i)(api[_-]?key|secret)[\"'\\s]*[:=][\"'\\s]*[a-zA-Z0-9]{16,}",
-    "severity": "CRITICAL",
-    "category": "A02",
-    "description": "Hardcoded API key detected",
-    "remediation": "Move API keys to environment variables or secure vault"
-  }
-]
-```
-
-Use with:
-```bash
-./scanner --rules rules.json --dir . --severity CRITICAL
-```
