@@ -734,5 +734,77 @@
     "category": "A05",
     "description": "X-Frame-Options header missing",
     "remediation": "Add `X-Frame-Options: DENY` or `SAMEORIGIN`."
+  },
+  {
+    "name": "MongoDB NoSQL Injection",
+    "pattern": "(?i)db\\.collection\\([^)]*\\$where[^)]*\\)",
+    "severity": "CRITICAL",
+    "category": "A03",
+    "description": "MongoDB $where injection vulnerability",
+    "remediation": "Use parameterized queries, avoid $where operator."
+  },
+  {
+    "name": "Unrestricted File Upload",
+    "pattern": "(?i)(move_uploaded_file|file_get_contents\\(\\$_FILES|uploadedfile\\.save)",
+    "severity": "CRITICAL",
+    "category": "A08",
+    "description": "File upload without validation",
+    "remediation": "Validate file types, scan uploads, restrict execution."
+  },
+  {
+    "name": "Direct Object Reference",
+    "pattern": "(?i)(SELECT.*WHERE\\s+id\\s*=|users/\\{\\w+\\}|/user/\\d+)",
+    "severity": "HIGH",
+    "category": "A01",
+    "description": "Potential IDOR vulnerability",
+    "remediation": "Implement proper authorization checks."
+  },
+  {
+    "name": "AWS Hardcoded Credentials",
+    "pattern": "(?i)(AKIA[0-9A-Z]{16}|aws_access_key_id\\s*=\\s*[\"'][^\"']+)",
+    "severity": "CRITICAL",
+    "category": "A02",
+    "description": "AWS access key in code",
+    "remediation": "Use IAM roles or AWS credential provider."
+  },
+  {
+    "name": "S3 Public Bucket",
+    "pattern": "(?i)s3.*public-read-write|AllUsers.*s3:GetObject",
+    "severity": "CRITICAL",
+    "category": "A05",
+    "description": "S3 bucket publicly accessible",
+    "remediation": "Restrict S3 bucket permissions."
+  },
+  {
+    "name": "Kubernetes Privileged Pod",
+    "pattern": "(?i)privileged:\\s*true|securityContext.*privileged.*true",
+    "severity": "CRITICAL",
+    "category": "A05",
+    "description": "Kubernetes pod running as privileged",
+    "remediation": "Remove privileged access, use specific capabilities."
+  },
+  {
+    "name": "Container Running as Root",
+    "pattern": "(?i)USER\\s+root|runAsUser:\\s*0",
+    "severity": "HIGH",
+    "category": "A05",
+    "description": "Container running as root user",
+    "remediation": "Use non-root user in containers."
+  },
+  {
+    "name": "Session Cookie",
+    "pattern": "(?i)Set-Cookie:",
+    "severity": "HIGH",
+    "category": "A05",
+    "description": "Set-Cookie header found",
+    "remediation": "Ensure Secure and HttpOnly flags are present."
+  },
+  {
+    "name": "Simple Path Traversal",
+    "pattern": "(?i)\\.\\.[/\\\\]",
+    "severity": "HIGH",
+    "category": "A05",
+    "description": "Potential path traversal sequence",
+    "remediation": "Validate and canonicalize file paths."
   }
 ]

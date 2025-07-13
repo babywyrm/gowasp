@@ -84,14 +84,21 @@ func loadRulesFromFile(path string) ([]Rule, error) {
     Remediation string `json:"remediation"`
   }
   if err := json.Unmarshal(data, &jr); err != nil {
-    return nil, err
+    return nil, fmt.Errorf("invalid JSON in %s: %w", path, err)
   }
   out := make([]Rule, len(jr))
   for i, r := range jr {
+    re, err := regexp.Compile(r.Pattern)
+    if err != nil {
+      return nil, fmt.Errorf(
+        "failed to compile regex for rule %q (index %d) in %s: %v",
+        r.Name, i, path, err,
+      )
+    }
     out[i] = Rule{
       Name:        r.Name,
       Regex:       r.Pattern,
-      Pattern:     regexp.MustCompile(r.Pattern),
+      Pattern:     re,
       Severity:    r.Severity,
       Category:    r.Category,
       Description: r.Description,
