@@ -1,0 +1,162 @@
+[
+  {
+    "name": "Docker Privileged Mode",
+    "pattern": "(?i)--privileged|privileged:\\s*true",
+    "severity": "CRITICAL",
+    "category": "A05",
+    "description": "Docker container running in privileged mode",
+    "remediation": "Run containers with minimal privileges."
+  },
+  {
+    "name": "Kubernetes Privileged Pod",
+    "pattern": "(?i)privileged:\\s*true|securityContext.*privileged.*true",
+    "severity": "CRITICAL",
+    "category": "A05",
+    "description": "Kubernetes pod running as privileged",
+    "remediation": "Remove privileged access, use specific capabilities."
+  },
+  {
+    "name": "Container Running as Root",
+    "pattern": "(?i)USER\\s+root|runAsUser:\\s*0",
+    "severity": "HIGH",
+    "category": "A05",
+    "description": "Container running as root user",
+    "remediation": "Use a non-root user in containers."
+  },
+  {
+    "name": "AWS Hardcoded Credentials",
+    "pattern": "(?i)(AKIA[0-9A-Z]{16}|aws_access_key_id\\s*=\\s*[\"'][^\"']+)",
+    "severity": "CRITICAL",
+    "category": "A02",
+    "description": "AWS access key in code",
+    "remediation": "Use IAM roles or AWS credential provider."
+  },
+  {
+    "name": "S3 Public Bucket",
+    "pattern": "(?i)s3.*public-read-write|AllUsers.*s3:GetObject",
+    "severity": "CRITICAL",
+    "category": "A05",
+    "description": "S3 bucket publicly accessible",
+    "remediation": "Restrict S3 bucket permissions."
+  },
+  {
+    "name": "Docker Latest Tag",
+    "pattern": "(?m)^FROM\\s+\\S+:latest",
+    "severity": "HIGH",
+    "category": "A08",
+    "description": "Using :latest can introduce new vulnerabilities",
+    "remediation": "Pin image to a specific version."
+  },
+  {
+    "name": "Docker ENV Secret",
+    "pattern": "(?i)^ENV\\s+\\w*(PASSWORD|SECRET|KEY)\\w*\\s+\\S+",
+    "severity": "CRITICAL",
+    "category": "A02",
+    "description": "Secrets in Dockerfile ENV",
+    "remediation": "Use build args or external secret store."
+  },
+  {
+    "name": "Docker ADD Remote URL",
+    "pattern": "(?m)^ADD\\s+https?://",
+    "severity": "HIGH",
+    "category": "A08",
+    "description": "ADD of remote URL can inject malicious content",
+    "remediation": "Download & verify outside of Dockerfile."
+  },
+  {
+    "name": "Docker CAP_ADD SYS_ADMIN",
+    "pattern": "(?i)cap_add:\\s*\\[?\\s*SYS_ADMIN",
+    "severity": "CRITICAL",
+    "category": "A05",
+    "description": "Adding SYS_ADMIN capability",
+    "remediation": "Drop unnecessary Linux capabilities."
+  },
+  {
+    "name": "Docker Host Network",
+    "pattern": "(?i)(hostNetwork:\\s*true|--network=host)",
+    "severity": "HIGH",
+    "category": "A05",
+    "description": "Using host network mode",
+    "remediation": "Use bridge network or CNI."
+  },
+  {
+    "name": "Kubernetes hostPath Mount",
+    "pattern": "(?i)hostPath:\\s*\\{",
+    "severity": "HIGH",
+    "category": "A05",
+    "description": "Pod mounting hostPath",
+    "remediation": "Avoid hostPath unless absolutely needed."
+  },
+  {
+    "name": "Kubernetes allowPrivilegeEscalation",
+    "pattern": "(?i)allowPrivilegeEscalation:\\s*true",
+    "severity": "HIGH",
+    "category": "A05",
+    "description": "Processes allowed to escalate privileges",
+    "remediation": "Set allowPrivilegeEscalation: false."
+  },
+  {
+    "name": "Kubernetes default ServiceAccount",
+    "pattern": "(?i)serviceAccountName:\\s*default",
+    "severity": "MEDIUM",
+    "category": "A05",
+    "description": "Using default ServiceAccount",
+    "remediation": "Use dedicated ServiceAccounts with least privileges."
+  },
+  {
+    "name": "Kubernetes hostPID or hostIPC",
+    "pattern": "(?i)(hostPID:\\s*true|hostIPC:\\s*true)",
+    "severity": "CRITICAL",
+    "category": "A05",
+    "description": "Pod sharing host PID/IPC namespace",
+    "remediation": "Disable hostPID/hostIPC."
+  },
+  {
+    "name": "Helm RBAC Disabled",
+    "pattern": "(?i)--set\\s+rbac\\.create\\s*=\\s*false",
+    "severity": "HIGH",
+    "category": "A05",
+    "description": "Skipping RBAC creation in Helm",
+    "remediation": "Enable RBAC in Helm charts."
+  },
+  {
+    "name": "Terraform AWS Credentials",
+    "pattern": "(?i)access_key\\s*=\\s*\"AKIA[0-9A-Z]{16}\"",
+    "severity": "CRITICAL",
+    "category": "A02",
+    "description": "AWS key in Terraform",
+    "remediation": "Use IAM roles / environment credentials."
+  },
+  {
+    "name": "CloudFormation CAPABILITY_IAM",
+    "pattern": "(?i)Capabilities:\\s*\\[?\\s*\"CAPABILITY_IAM\"",
+    "severity": "MEDIUM",
+    "category": "A05",
+    "description": "Stack allows implicit IAM changes",
+    "remediation": "Review all IAM policy changes."
+  },
+  {
+    "name": "GCP Service Account Key",
+    "pattern": "(?i)\"type\":\\s*\"service_account\"",
+    "severity": "CRITICAL",
+    "category": "A02",
+    "description": "GCP service account key file detected",
+    "remediation": "Remove keys from code, use Workload Identity."
+  },
+  {
+    "name": "Azure CLI Login",
+    "pattern": "(?i)az\\s+login",
+    "severity": "MEDIUM",
+    "category": "A09",
+    "description": "Azure CLI login in scripts",
+    "remediation": "Use managed identity or service principal."
+  },
+  {
+    "name": "Ansible Vault Password",
+    "pattern": "(?i)--vault-password-file\\s+\\S+",
+    "severity": "MEDIUM",
+    "category": "A05",
+    "description": "Vault password file referenced",
+    "remediation": "Use environment variables or Ansible Tower."
+  }
+]

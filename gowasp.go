@@ -117,38 +117,32 @@ func init() {
   }
 }
 
-// Check if a finding's severity meets the minimum threshold
 func meetsSeverityThreshold(findingSeverity, minSeverity string) bool {
   if minSeverity == "" {
-    return true // No filter, show all
+    return true
   }
-
-  findingLevel, exists := severityLevels[findingSeverity]
-  if !exists {
-    return true // Unknown severity, include by default
+  fLvl, ok := severityLevels[findingSeverity]
+  if !ok {
+    return true
   }
-
-  minLevel, exists := severityLevels[minSeverity]
-  if !exists {
-    return true // Unknown min severity, include by default
+  mLvl, ok := severityLevels[minSeverity]
+  if !ok {
+    return true
   }
-
-  return findingLevel >= minLevel
+  return fLvl >= mLvl
 }
 
-// Filter findings by minimum severity
 func filterBySeverity(findings []Finding, minSeverity string) []Finding {
   if minSeverity == "" {
     return findings
   }
-
-  var filtered []Finding
+  var out []Finding
   for _, f := range findings {
     if meetsSeverityThreshold(f.Severity, minSeverity) {
-      filtered = append(filtered, f)
+      out = append(out, f)
     }
   }
-  return filtered
+  return out
 }
 
 func runCommand(ctx context.Context, cmd string, args ...string) (string, error) {
@@ -166,26 +160,26 @@ func getGitChangedFiles(ctx context.Context) ([]string, error) {
 }
 
 func loadIgnorePatterns(ignoreFlag string) ([]string, error) {
-  var patterns []string
+  var pats []string
   if ignoreFlag != "" {
-    patterns = append(patterns, strings.Split(ignoreFlag, ",")...)
+    pats = append(pats, strings.Split(ignoreFlag, ",")...)
   }
   f, err := os.Open(".scannerignore")
   if err != nil {
     if os.IsNotExist(err) {
-      return patterns, nil
+      return pats, nil
     }
     return nil, err
   }
   defer f.Close()
-  scanner := bufio.NewScanner(f)
-  for scanner.Scan() {
-    line := strings.TrimSpace(scanner.Text())
-    if line != "" && !strings.HasPrefix(line, "#") {
-      patterns = append(patterns, line)
+  sc := bufio.NewScanner(f)
+  for sc.Scan() {
+    l := strings.TrimSpace(sc.Text())
+    if l != "" && !strings.HasPrefix(l, "#") {
+      pats = append(pats, l)
     }
   }
-  return patterns, scanner.Err()
+  return pats, sc.Err()
 }
 
 func shouldIgnore(path string, patterns []string) bool {
@@ -201,44 +195,39 @@ func scanFile(path string, debug bool) ([]Finding, error) {
   if debug {
     log.Printf("Scanning file: %s", path)
   }
-  var findings []Finding
+  var out []Finding
   f, err := os.Open(path)
   if err != nil {
-    return findings, err
+    return out, err
   }
   defer f.Close()
 
-  scanner := bufio.NewScanner(f)
+  sc := bufio.NewScanner(f)
+  const maxCap = 10 * 1024 * 1024
+  buf := make([]byte, 0, 64*1024)
+  sc.Buffer(buf, maxCap)
 
-  // Fix: Increase the scanner buffer size to handle large lines
-  const maxCapacity = 1024 * 1024 * 10 // 10MB buffer
-  buf := make([]byte, 0, 64*1024)       // Initial 64KB buffer
-  scanner.Buffer(buf, maxCapacity)
-
-  lineNum := 0
-  for scanner.Scan() {
-    lineNum++
-    text := scanner.Text()
-
-    // Skip extremely long lines for performance
-    if len(text) > 100000 { // Skip lines longer than 100KB
+  ln := 0
+  for sc.Scan() {
+    ln++
+    txt := sc.Text()
+    if len(txt) > 100000 {
       if debug {
-        log.Printf("Skipping very long line %d in %s (length: %d)", lineNum, path, len(text))
+        log.Printf("Skipping long line %d in %s len=%d", ln, path, len(txt))
       }
       continue
     }
-
     for _, r := range rules {
-      if r.Pattern.MatchString(text) {
-        match := r.Pattern.FindString(text)
-        if len(match) > 80 {
-          match = match[:80] + "..."
+      if r.Pattern.MatchString(txt) {
+        m := r.Pattern.FindString(txt)
+        if len(m) > 80 {
+          m = m[:80] + "..."
         }
-        findings = append(findings, Finding{
+        out = append(out, Finding{
           File:      path,
-          Line:      lineNum,
+          Line:      ln,
           RuleName:  r.Name,
-          Match:     match,
+          Match:     m,
           Severity:  r.Severity,
           Category:  r.Category,
           Timestamp: time.Now(),
@@ -246,22 +235,15 @@ func scanFile(path string, debug bool) ([]Finding, error) {
       }
     }
   }
-
-  // Handle scanner errors more gracefully
-  if err := scanner.Err(); err != nil {
-    if debug {
-      log.Printf("Scanner error for %s: %v", path, err)
-    }
-    // Don't fail completely, just log and continue
-    return findings, nil
+  if err := sc.Err(); err != nil && debug {
+    log.Printf("Scanner error %s: %v", path, err)
   }
-
-  return findings, nil
+  return out, nil
 }
 
 func scanDir(ctx context.Context, root string, useGit, debug bool, ignorePatterns []string) ([]Finding, error) {
   if debug {
-    log.Printf("Starting scan in %s (git=%v)", root, useGit)
+    log.Printf("Starting scan in %s git=%v", root, useGit)
   }
   var files []string
   if useGit {
@@ -271,12 +253,12 @@ func scanDir(ctx context.Context, root string, useGit, debug bool, ignorePattern
     }
     files = fs
   } else {
-    filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+    filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
       if err != nil {
         return err
       }
-      if !d.IsDir() && supportedExtensions[filepath.Ext(path)] && !shouldIgnore(path, ignorePatterns) {
-        files = append(files, path)
+      if !d.IsDir() && supportedExtensions[filepath.Ext(p)] && !shouldIgnore(p, ignorePatterns) {
+        files = append(files, p)
       }
       return nil
     })
@@ -286,7 +268,7 @@ func scanDir(ctx context.Context, root string, useGit, debug bool, ignorePattern
   for _, f := range files {
     fs, err := scanFile(f, debug)
     if err != nil {
-      log.Printf("Warning: failed to scan %s: %v", f, err)
+      log.Printf("Warning: scan %s: %v", f, err)
       continue
     }
     all = append(all, fs...)
@@ -295,8 +277,7 @@ func scanDir(ctx context.Context, root string, useGit, debug bool, ignorePattern
 }
 
 func summarize(findings []Finding) {
-  sev := map[string]int{}
-  cat := map[string]int{}
+  sev, cat := map[string]int{}, map[string]int{}
   for _, f := range findings {
     sev[f.Severity]++
     cat[f.Category]++
@@ -317,17 +298,18 @@ func outputMarkdownBody(findings []Finding, verbose bool) string {
   b.WriteString("| File | Line | Rule | Match | Severity | OWASP |\n")
   b.WriteString("|------|------|------|-------|----------|-------|\n")
   for _, f := range findings {
-    b.WriteString(fmt.Sprintf("| `%s` | %d | %s | `%s` | **%s** | %s |\n", f.File, f.Line, f.RuleName, f.Match, f.Severity, f.Category))
+    b.WriteString(fmt.Sprintf("| `%s` | %d | %s | `%s` | **%s** | %s |\n",
+      f.File, f.Line, f.RuleName, f.Match, f.Severity, f.Category))
   }
   if verbose {
     b.WriteString("\n---\n### 🛠 Remediation Brief\n\n")
     for _, f := range findings {
       r := ruleMap[f.RuleName]
-      b.WriteString(fmt.Sprintf("- **%s:%d** – %s\n    - %s\n\n", f.File, f.Line, r.Name, r.Remediation))
+      b.WriteString(fmt.Sprintf("- **%s:%d** – %s\n    - %s\n\n",
+        f.File, f.Line, r.Name, r.Remediation))
     }
   }
-  sevCount := map[string]int{}
-  catCount := map[string]int{}
+  sevCount, catCount := map[string]int{}, map[string]int{}
   for _, f := range findings {
     sevCount[f.Severity]++
     catCount[f.Category]++
@@ -339,8 +321,8 @@ func outputMarkdownBody(findings []Finding, verbose bool) string {
     }
   }
   b.WriteString("\n**OWASP Category Summary**\n\n")
-  for cat, count := range catCount {
-    b.WriteString(fmt.Sprintf("- **%s**: %d\n", cat, count))
+  for c, cnt := range catCount {
+    b.WriteString(fmt.Sprintf("- **%s**: %d\n", c, cnt))
   }
   return b.String()
 }
@@ -379,59 +361,71 @@ func main() {
   ignoreFlag := flag.String("ignore", "vendor,node_modules,dist,public,build", "Ignore patterns")
   postToGitHub := flag.Bool("github-pr", false, "Post results to GitHub PR")
   verbose := flag.Bool("verbose", false, "Show short remediation advice")
-  ruleFile := flag.String("rules", "", "Path to external rules.json (overrides built-in)")
+  ruleFiles := flag.String("rules", "", "Comma-separated paths to external rules.json files (overrides built-in)")
   minSeverity := flag.String("severity", "", "Minimum severity to show (CRITICAL, HIGH, MEDIUM, LOW)")
   flag.Parse()
 
-  // Validate severity flag
   if *minSeverity != "" {
-    if _, exists := severityLevels[*minSeverity]; !exists {
-      log.Fatalf("Invalid severity level: %s. Valid options: CRITICAL, HIGH, MEDIUM, LOW", *minSeverity)
+    if _, ok := severityLevels[*minSeverity]; !ok {
+      log.Fatalf("Invalid severity: %s. Valid: CRITICAL, HIGH, MEDIUM, LOW", *minSeverity)
     }
   }
 
-  rulePath := *ruleFile
-  if rulePath == "" {
-    if _, err := os.Stat("rules.json"); err == nil {
-      rulePath = "rules.json"
+  // Load external rule files if provided (comma-separated)
+  if *ruleFiles != "" {
+    rules = nil
+    ruleMap = make(map[string]Rule)
+    parts := strings.Split(*ruleFiles, ",")
+    for _, rf := range parts {
+      rf = strings.TrimSpace(rf)
       if *debug {
-        log.Println("No rules file passed, using rules.json from current directory")
+        log.Printf("Loading rules from %s", rf)
+      }
+      loaded, err := loadRulesFromFile(rf)
+      if err != nil {
+        log.Fatalf("failed to load rules from %s: %v", rf, err)
+      }
+      for _, r := range loaded {
+        rules = append(rules, r)
+        ruleMap[r.Name] = r
       }
     }
-  }
-
-  if rulePath != "" {
-    loaded, err := loadRulesFromFile(rulePath)
-    if err != nil {
-      log.Fatalf("failed to load rules from %s: %v", rulePath, err)
-    }
-    rules = loaded
-    ruleMap = make(map[string]Rule)
-    for _, r := range rules {
-      ruleMap[r.Name] = r
+  } else {
+    // fallback to built-in + rules.json if present
+    if _, err := os.Stat("rules.json"); err == nil {
+      if *debug {
+        log.Println("No --rules flagged, loading rules.json")
+      }
+      loaded, err := loadRulesFromFile("rules.json")
+      if err != nil {
+        log.Fatalf("failed to load rules.json: %v", err)
+      }
+      rules = loaded
+      ruleMap = make(map[string]Rule)
+      for _, r := range rules {
+        ruleMap[r.Name] = r
+      }
     }
   }
 
   if *debug {
     log.Println("Debug mode enabled")
     if *minSeverity != "" {
-      log.Printf("Filtering for minimum severity: %s and above", *minSeverity)
+      log.Printf("Filtering for severity >= %s", *minSeverity)
     }
   }
   ignorePatterns, err := loadIgnorePatterns(*ignoreFlag)
   if err != nil {
-    log.Fatalf("Failed to load ignore patterns: %v", err)
+    log.Fatalf("Failed loading ignore patterns: %v", err)
   }
 
   allFindings, err := scanDir(context.Background(), *dir, *useGit, *debug, ignorePatterns)
   if err != nil {
     log.Fatalf("Scan error: %v", err)
   }
-
-  // Apply severity filter
   findings := filterBySeverity(allFindings, *minSeverity)
 
-  // Sort findings by severity, category, file, then line
+  // Sort findings
   sort.Slice(findings, func(i, j int) bool {
     si := severityLevels[findings[i].Severity]
     sj := severityLevels[findings[j].Severity]
@@ -449,7 +443,7 @@ func main() {
 
   if len(findings) == 0 {
     if *minSeverity != "" && len(allFindings) > 0 {
-      fmt.Printf("✅ No issues found at %s severity or above.\n", *minSeverity)
+      fmt.Printf("✅ No issues at %s or above.\n", *minSeverity)
     } else {
       fmt.Println("✅ No issues found.")
     }
@@ -457,15 +451,15 @@ func main() {
   }
 
   if *minSeverity != "" {
-    fmt.Printf("Showing findings with minimum severity: %s and above\n", *minSeverity)
-    fmt.Printf("Found %d findings (filtered from %d total)\n", len(findings), len(allFindings))
+    fmt.Printf("Showing findings >= %s. %d of %d total.\n", *minSeverity, len(findings), len(allFindings))
   }
-
   summarize(findings)
+
   switch *output {
   case "text":
     for _, f := range findings {
-      fmt.Printf("[%s] %s:%d - %s (%s)\n", f.Severity, f.File, f.Line, f.Match, f.Category)
+      fmt.Printf("[%s] %s:%d - %s (%s)\n",
+        f.Severity, f.File, f.Line, f.Match, f.Category)
     }
   case "json":
     enc := json.NewEncoder(os.Stdout)
@@ -478,7 +472,7 @@ func main() {
       if err := postGitHubComment(body); err != nil {
         log.Printf("GitHub comment failed: %v", err)
       } else {
-        fmt.Println("✅ Comment posted to PR.")
+        fmt.Println("✅ Comment posted.")
       }
     }
   default:
