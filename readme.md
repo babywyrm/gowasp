@@ -98,7 +98,7 @@ Run `./scanner --help` for full flag details.
 ./scanner --dir . --severity HIGH --ignore "vendor/**,**/tests/**,**/test/**,node_modules/**"
 ```
 
-**Example: DVWA Scanning (from our testing)**
+** Yes, Examples: DVWA Scanning 
 ```bash
 # Noisy: Full DVWA scan (178 findings)
 ./scanner --dir ../../dvwa --severity MEDIUM --output markdown
@@ -109,6 +109,24 @@ Run `./scanner --help` for full flag details.
 
 # Best: Focus on real application code (11 findings)
 ./scanner --dir ../../dvwa/vulnerabilities/api --severity HIGH --output markdown
+
+
+** Another Example: WebGoat Scanning 
+
+```bash
+# Noisy: Full WebGoat scan (391 findings)
+./scanner --dir ../../WebGoat --severity HIGH --output markdown
+
+# Better: Skip integration tests, unit tests & static assets (~100 findings)
+./scanner --dir ../../WebGoat --severity HIGH --output markdown \
+  --ignore "src/it/**,src/test/**,**/static/**,**/resources/**"
+
+# Best: Focus on core lesson code (~20 findings)
+./scanner --dir ../../WebGoat/src/main/java/org/owasp/webgoat/lessons \
+  --severity HIGH --output markdown
+```
+
+
 ```
 
 ### 📁 Using .scannerignore File
