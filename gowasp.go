@@ -15,6 +15,7 @@ import (
   "os/exec"
   "path/filepath"
   "regexp"
+  "sort"
   "strings"
   "time"
 
@@ -429,6 +430,22 @@ func main() {
 
   // Apply severity filter
   findings := filterBySeverity(allFindings, *minSeverity)
+
+  // Sort findings by severity, category, file, then line
+  sort.Slice(findings, func(i, j int) bool {
+    si := severityLevels[findings[i].Severity]
+    sj := severityLevels[findings[j].Severity]
+    if si != sj {
+      return si > sj
+    }
+    if findings[i].Category != findings[j].Category {
+      return findings[i].Category < findings[j].Category
+    }
+    if findings[i].File != findings[j].File {
+      return findings[i].File < findings[j].File
+    }
+    return findings[i].Line < findings[j].Line
+  })
 
   if len(findings) == 0 {
     if *minSeverity != "" && len(allFindings) > 0 {

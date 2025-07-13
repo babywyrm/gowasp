@@ -806,5 +806,101 @@
     "category": "A05",
     "description": "Potential path traversal sequence",
     "remediation": "Validate and canonicalize file paths."
+  },
+  {
+    "name": "PHP Unserialize",
+    "pattern": "(?i)unserialize\\s*\\(",
+    "severity": "CRITICAL",
+    "category": "A03",
+    "description": "Untrusted data passed to unserialize()",
+    "remediation": "Avoid PHP unserialize; use JSON or safe parsers."
+  },
+  {
+    "name": "Insecure File Permissions",
+    "pattern": "(?i)chmod\\s+0?777",
+    "severity": "HIGH",
+    "category": "A01",
+    "description": "Files made world-writable",
+    "remediation": "Use least-privilege permissions."
+  },
+  {
+    "name": "AES ECB Mode",
+    "pattern": "(?i)AES/ECB/NoPadding",
+    "severity": "HIGH",
+    "category": "A02",
+    "description": "AES in ECB mode is insecure",
+    "remediation": "Use CBC or GCM modes with IV."
+  },
+  {
+    "name": "JS Function Constructor",
+    "pattern": "(?i)new\\s+Function\\s*\\(",
+    "severity": "CRITICAL",
+    "category": "A03",
+    "description": "Dynamic code via Function constructor",
+    "remediation": "Avoid new Function(); use static code."
+  },
+  {
+    "name": "XStream Deserialization",
+    "pattern": "(?i)new\\s+XStream\\s*\\(",
+    "severity": "CRITICAL",
+    "category": "A08",
+    "description": "XStream deserialization can lead to RCE",
+    "remediation": "Disable untrusted types or use safe libraries."
+  },
+  {
+    "name": "Schema Validation Disabled",
+    "pattern": "(?i)validateSchema\\s*[:=]\\s*false",
+    "severity": "MEDIUM",
+    "category": "A04",
+    "description": "Schema validation turned off",
+    "remediation": "Enable input schema validation."
+  },
+  {
+    "name": "Open CORS in Spring",
+    "pattern": "(?i)allowedOrigins\\s*=\\s*\"\\*\"",
+    "severity": "HIGH",
+    "category": "A05",
+    "description": "CORS allows any origin",
+    "remediation": "Restrict CORS to specific domains."
+  },
+  {
+    "name": "NPM Audit Bypass",
+    "pattern": "(?i)npm\\s+audit\\s+--omit=dev",
+    "severity": "HIGH",
+    "category": "A06",
+    "description": "Skipping dev vulnerabilities",
+    "remediation": "Run full audit and fix issues."
+  },
+  {
+    "name": "Auth Disabled",
+    "pattern": "(?i)auth\\s*=\\s*false",
+    "severity": "HIGH",
+    "category": "A07",
+    "description": "Authentication turned off in config",
+    "remediation": "Require auth for all endpoints."
+  },
+  {
+    "name": "Docker Latest Tag",
+    "pattern": "(?m)^FROM\\s+\\S+:latest",
+    "severity": "HIGH",
+    "category": "A08",
+    "description": "Using :latest can introduce new vulnerabilities",
+    "remediation": "Pin image to a specific version."
+  },
+  {
+    "name": "Silent Catch",
+    "pattern": "(?i)catch\\s*\\([^)]*\\)\\s*\\{\\s*\\}",
+    "severity": "HIGH",
+    "category": "A09",
+    "description": "Exception handler is empty",
+    "remediation": "Log or handle exceptions appropriately."
+  },
+  {
+    "name": "Axios SSRF",
+    "pattern": "(?i)axios\\.(get|post|put|delete)\\s*\\(",
+    "severity": "HIGH",
+    "category": "A10",
+    "description": "Potential SSRF via axios request",
+    "remediation": "Whitelist/validate external URLs."
   }
 ]
