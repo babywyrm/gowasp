@@ -1,0 +1,82 @@
+[
+  {
+    "name": "NPM Wildcard Dependency",
+    "pattern": "\"[^\"]+\":\\s*\"\\*\"",
+    "severity": "MEDIUM",
+    "category": "A06",
+    "description": "Wildcard dependency in package.json",
+    "remediation": "Pin dependency versions explicitly."
+  },
+  {
+    "name": "Git Package Dependency",
+    "pattern": "\"git\\+https?://[^\"]+\"",
+    "severity": "MEDIUM",
+    "category": "A06",
+    "description": "Git repo instead of versioned package",
+    "remediation": "Use versioned releases, not direct git URLs."
+  },
+  {
+    "name": "HTTP NPM Install",
+    "pattern": "(?i)npm\\s+install\\s+.*http://",
+    "severity": "HIGH",
+    "category": "A06",
+    "description": "Installing packages over HTTP",
+    "remediation": "Use HTTPS registries only."
+  },
+  {
+    "name": "HTTP PIP Install",
+    "pattern": "(?i)pip\\s+install\\s+.*http://",
+    "severity": "HIGH",
+    "category": "A06",
+    "description": "Installing Python packages over HTTP",
+    "remediation": "Use HTTPS PyPI endpoints."
+  },
+  {
+    "name": "Yarn HTTP Install",
+    "pattern": "(?i)yarn\\s+add\\s+.*http://",
+    "severity": "HIGH",
+    "category": "A06",
+    "description": "Installing packages over HTTP",
+    "remediation": "Use HTTPS registries only."
+  },
+  {
+    "name": "Go Get Latest",
+    "pattern": "(?i)go\\s+get\\s+.*@latest",
+    "severity": "MEDIUM",
+    "category": "A06",
+    "description": "Fetching Go modules without version pin",
+    "remediation": "Pin module to a specific version."
+  },
+  {
+    "name": "Git HTTP Clone",
+    "pattern": "(?i)git\\s+clone\\s+http://",
+    "severity": "HIGH",
+    "category": "A06",
+    "description": "Cloning repos over HTTP",
+    "remediation": "Use HTTPS or SSH for git clones."
+  },
+  {
+    "name": "Unpinned Docker Base Image",
+    "pattern": "(?m)^FROM\\s+\\S+:[^@\\s]+$",
+    "severity": "MEDIUM",
+    "category": "A08",
+    "description": "Dockerfile base image without digest",
+    "remediation": "Pin to an immutable digest (e.g. @sha256:...)."
+  },
+  {
+    "name": "Helm HTTP Repo",
+    "pattern": "(?i)helm\\s+repo\\s+add\\s+\\S+\\s+http://",
+    "severity": "HIGH",
+    "category": "A06",
+    "description": "Adding Helm repo over HTTP",
+    "remediation": "Use HTTPS for Helm repositories."
+  },
+  {
+    "name": "Terraform AWS Hardcoded Key",
+    "pattern": "(?i)access_key\\s*=\\s*\"AKIA[0-9A-Z]{16}\"",
+    "severity": "CRITICAL",
+    "category": "A02",
+    "description": "AWS access key in Terraform",
+    "remediation": "Use IAM roles or environment credentials."
+  }
+]

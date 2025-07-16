@@ -1,0 +1,106 @@
+[
+  {
+    "name": "GitHub Action Unpinned",
+    "pattern": "(?mi)^\\s*uses:\\s*[^@]+@(?:main|master|latest)\\b",
+    "severity": "HIGH",
+    "category": "A08",
+    "description": "Unpinned GitHub Action version can lead to supply-chain attacks.",
+    "remediation": "Pin Actions to a specific, immutable tag or commit SHA."
+  },
+  {
+    "name": "GitHub Event Injection",
+    "pattern": "\\$\\{\\{\\s*github\\.event\\.[^}]+\\}\\}",
+    "severity": "CRITICAL",
+    "category": "A03",
+    "description": "Potential script injection via github.event context in a 'run' step.",
+    "remediation": "Do not use raw event fields in scripts. Pass them to environment variables first."
+  },
+  {
+    "name": "Jenkinsfile Shell Step",
+    "pattern": "(?mi)^\\s*sh\\s+['\"].*['\"]",
+    "severity": "HIGH",
+    "category": "A03",
+    "description": "Jenkinsfile shell step can be vulnerable to command injection if using variables.",
+    "remediation": "Use pipeline steps with proper argument binding instead of raw shell commands."
+  },
+  {
+    "name": "Travis Encrypted Key",
+    "pattern": "(?mi)^\\s*secure:\\s+[A-Za-z0-9+/=]+",
+    "severity": "MEDIUM",
+    "category": "A02",
+    "description": "Encrypted key found in .travis.yml. Ensure it is not for a high-privilege account.",
+    "remediation": "Audit the key's permissions. Prefer short-lived credentials where possible."
+  },
+  {
+    "name": "Travis Plaintext Env",
+    "pattern": "(?mi)^\\s*env:?\\s*\\w*(PASSWORD|SECRET|TOKEN|KEY)\\w*\\s*=\\s*['\"][^'\"]+['\"]",
+    "severity": "CRITICAL",
+    "category": "A02",
+    "description": "Plaintext secret found in .travis.yml environment variables.",
+    "remediation": "Move secrets to secure, encrypted CI settings."
+  },
+  {
+    "name": "CircleCI Unlocked Checkout",
+    "pattern": "(?mi)^\\s*-\\s*checkout@(?:v[0-9]+|main|master|latest)\\b",
+    "severity": "HIGH",
+    "category": "A08",
+    "description": "Unpinned CircleCI checkout step can lead to supply-chain attacks.",
+    "remediation": "Pin the checkout orb to a specific, immutable version."
+  },
+  {
+    "name": "Azure Pipeline Secrets in Script",
+    "pattern": "(?mi)docker login.*\\$(?:AZURE_|DOCKER_)",
+    "severity": "HIGH",
+    "category": "A09",
+    "description": "Secrets may be exposed in logs when used directly in script steps.",
+    "remediation": "Use built-in secret handling tasks and map secrets to environment variables."
+  },
+  {
+    "name": "Echoing Secrets in CI",
+    "pattern": "(?i)echo\\s+\\$?\\{?(SECRET|PASSWORD|TOKEN|API_KEY)",
+    "severity": "HIGH",
+    "category": "A09",
+    "description": "Echoing a variable that looks like a secret can expose it in build logs.",
+    "remediation": "Never echo secrets. Use secret masking features of your CI system."
+  },
+  {
+    "name": "Bypassing Security Scans",
+    "pattern": "(?i)(trivy|snyk|grype|semgrep).*--(?:skip|disable|exclude|no-fail)",
+    "severity": "HIGH",
+    "category": "A05",
+    "description": "A security scanner is being run with a flag that may bypass or ignore vulnerabilities.",
+    "remediation": "Ensure all security scans run with a strict, non-permissive configuration."
+  },
+  {
+    "name": "Hardcoded Credentials in Curl",
+    "pattern": "(?i)curl.*-u\\s+[^:]+:[^\\s]+",
+    "severity": "CRITICAL",
+    "category": "A02",
+    "description": "Hardcoded username and password found in a curl command.",
+    "remediation": "Use environment variables or CI secrets for credentials in scripts."
+  },
+  {
+    "name": "GitLab CI Plaintext Secret",
+    "pattern": "(?i)variables:.*(SECRET|PASSWORD|TOKEN):\\s*['\"].+['\"]",
+    "severity": "CRITICAL",
+    "category": "A02",
+    "description": "Plaintext secret detected in GitLab CI variables block.",
+    "remediation": "Use GitLab's protected CI/CD variables for secrets."
+  },
+  {
+    "name": "Terraform/Pulumi Plaintext Secret",
+    "pattern": "(?i)(TF_VAR|PULUMI_CONFIG).*=\\s*['\"].+['\"]",
+    "severity": "HIGH",
+    "category": "A02",
+    "description": "Plaintext secret being passed to Terraform or Pulumi.",
+    "remediation": "Use a secure secret store like HashiCorp Vault, AWS Secrets Manager, or Pulumi's secret management."
+  },
+  {
+    "name": "AWS CLI Configure with Static Keys",
+    "pattern": "(?i)aws\\s+configure\\s+set\\s+(aws_access_key_id|aws_secret_access_key)",
+    "severity": "CRITICAL",
+    "category": "A02",
+    "description": "Static AWS keys are being configured in a CI script. This is a high-risk practice.",
+    "remediation": "Use temporary credentials via IAM Roles for Service Accounts (IRSA) or OpenID Connect (OIDC)."
+  }
+]
