@@ -1,107 +1,11 @@
 [
   {
-    "name": "Backdoor Shell Command",
-    "pattern": "(?i)(nc\\s+-l|netcat.*-l|bash\\s+-i|sh\\s+-i|/bin/sh.*-i)",
-    "severity": "CRITICAL",
-    "category": "A08",
-    "description": "Reverse shell/backdoor pattern",
-    "remediation": "Remove malicious code immediately."
-  },
-  {
-    "name": "Web Shell Pattern",
-    "pattern": "(?i)(\\$_(?:GET|POST|REQUEST)\\s*\\[.*\\].*(?:eval|system|exec)|assert\\s*\\(\\s*\\$_)",
-    "severity": "CRITICAL",
-    "category": "A03",
-    "description": "PHP web shell pattern",
-    "remediation": "Remove web shell immediately."
-  },
-  {
     "name": "Database Root Password",
     "pattern": "(?i)(root|admin|sa)\\s*[\"']\\s*:\\s*[\"'](password|admin|root|123456|''|\"\")",
     "severity": "CRITICAL",
     "category": "A02",
     "description": "Default/weak database credentials",
     "remediation": "Change default passwords immediately."
-  },
-  {
-    "name": "Crypto Mining",
-    "pattern": "(?i)(stratum\\+tcp|mining\\.pool|xmrig|monero|bitcoin.*pool|cryptonight)",
-    "severity": "CRITICAL",
-    "category": "A08",
-    "description": "Cryptocurrency mining code",
-    "remediation": "Remove unauthorized mining code."
-  },
-  {
-    "name": "Data Exfiltration",
-    "pattern": "(?i)(curl.*-X\\s+POST.*\\.(pastebin|hastebin|discord|telegram)|wget.*evil|base64.*decode.*sh)",
-    "severity": "CRITICAL",
-    "category": "A09",
-    "description": "Potential data exfiltration",
-    "remediation": "Investigate and remove malicious code."
-  },
-  {
-    "name": "Direct System File Access",
-    "pattern": "(?i)(/etc/passwd|/etc/shadow|/etc/hosts|C:\\\\Windows\\\\System32)",
-    "severity": "CRITICAL",
-    "category": "A05",
-    "description": "Direct system file access",
-    "remediation": "Avoid direct system file manipulation."
-  },
-  {
-    "name": "SQL Injection Obvious",
-    "pattern": "(?i)(union\\s+select.*from|' or '1'='1|' or 1=1|admin'--)",
-    "severity": "CRITICAL",
-    "category": "A03",
-    "description": "Obvious SQL injection pattern",
-    "remediation": "Use parameterized queries immediately."
-  },
-  {
-    "name": "XSS Obvious",
-    "pattern": "(?i)(<script>alert\\(|<img.*onerror=|javascript:alert\\()",
-    "severity": "CRITICAL",
-    "category": "A07",
-    "description": "Obvious XSS payload",
-    "remediation": "Sanitize and escape all user input."
-  },
-  {
-    "name": "Password in URL",
-    "pattern": "(?i)(http|ftp)s?://[^/]*:[^@]*@",
-    "severity": "CRITICAL",
-    "category": "A02",
-    "description": "Credentials in URL",
-    "remediation": "Use secure authentication methods."
-  },
-  {
-    "name": "Malicious Domain",
-    "pattern": "(?i)(evil\\.com|malware\\.site|c2\\.server|badactor\\.net)",
-    "severity": "CRITICAL",
-    "category": "A08",
-    "description": "Known malicious domain reference",
-    "remediation": "Remove malicious domain references."
-  },
-  {
-    "name": "Buffer Overflow Pattern",
-    "pattern": "(?i)(strcpy\\s*\\(|gets\\s*\\(|sprintf\\s*\\(.*%s)",
-    "severity": "CRITICAL",
-    "category": "A08",
-    "description": "Buffer overflow vulnerable function",
-    "remediation": "Use safe string functions (strncpy, fgets, snprintf)."
-  },
-  {
-    "name": "Remote Code Execution PHP",
-    "pattern": "(?i)(\\$_(?:GET|POST|REQUEST)\\s*\\[.*\\].*(?:file_get_contents|include|require)|create_function\\s*\\()",
-    "severity": "CRITICAL",
-    "category": "A03",
-    "description": "PHP RCE pattern",
-    "remediation": "Validate and sanitize all user input."
-  },
-  {
-    "name": "SSH Private Key Exposed",
-    "pattern": "(?i)-----BEGIN (RSA|OPENSSH|DSA|EC) PRIVATE KEY-----",
-    "severity": "CRITICAL",
-    "category": "A02",
-    "description": "SSH private key in code",
-    "remediation": "Remove private key and regenerate keypair."
   },
   {
     "name": "Environment Variable Secrets",
@@ -112,28 +16,44 @@
     "remediation": "Use secure secret management."
   },
   {
+    "name": "JWT Algorithm None",
+    "pattern": "(?i)jwt.*(none|algorithm_none)",
+    "severity": "CRITICAL",
+    "category": "A02",
+    "description": "JWT 'alg' header set to 'none', which can allow signature bypass.",
+    "remediation": "Reject JWTs with the 'none' algorithm on the server-side."
+  },
+  {
+    "name": "Password in URL",
+    "pattern": "(?i)(http|ftp)s?://[^/]*:[^@]*@",
+    "severity": "CRITICAL",
+    "category": "A02",
+    "description": "Credentials in URL",
+    "remediation": "Use secure authentication methods."
+  },
+  {
+    "name": "SSH Private Key Exposed",
+    "pattern": "(?i)-----BEGIN (RSA|OPENSSH|DSA|EC) PRIVATE KEY-----",
+    "severity": "CRITICAL",
+    "category": "A02",
+    "description": "SSH private key in code",
+    "remediation": "Remove private key and regenerate keypair."
+  },
+  {
+    "name": "Weak JWT Secret",
+    "pattern": "(?i)(jwt|secret|signing_key)\\s*[:=]\\s*['\"](secret|password|123456|admin)['\"]",
+    "severity": "CRITICAL",
+    "category": "A02",
+    "description": "A weak, easily guessable secret is used for signing JWTs.",
+    "remediation": "Use a long, high-entropy, randomly generated secret for signing JWTs."
+  },
+  {
     "name": "Command Exec",
     "pattern": "(?i)(system|exec)\\s*\\(",
     "severity": "CRITICAL",
     "category": "A03",
     "description": "System/exec call - immediate RCE risk",
     "remediation": "Use allow-lists & sanitize args."
-  },
-  {
-    "name": "Python os.system",
-    "pattern": "(?i)os\\.system\\(",
-    "severity": "CRITICAL",
-    "category": "A03",
-    "description": "os.system call - direct shell execution",
-    "remediation": "Use subprocess with shell=False."
-  },
-  {
-    "name": "JS eval with template literals",
-    "pattern": "(?i)eval\\(",
-    "severity": "CRITICAL",
-    "category": "A03",
-    "description": "eval() - direct code execution",
-    "remediation": "Avoid eval(); use safe parsing."
   },
   {
     "name": "Go exec.CommandContext",
@@ -144,588 +64,20 @@
     "remediation": "Sanitize args; use allow-lists."
   },
   {
-    "name": "innerHTML",
-    "pattern": "(?i)\\.innerHTML\\s*=",
-    "severity": "HIGH",
-    "category": "A07",
-    "description": "innerHTML assignment",
-    "remediation": "Use textContent or sanitize."
-  },
-  {
-    "name": "XXE/XML External Entity",
-    "pattern": "(?i)<!DOCTYPE\\s+[^>]*\\s+SYSTEM\\s+[\"'][^\"']+[\"']",
-    "severity": "HIGH",
+    "name": "JS Function Constructor",
+    "pattern": "(?i)new\\s+Function\\s*\\(",
+    "severity": "CRITICAL",
     "category": "A03",
-    "description": "Possible XXE declaration",
-    "remediation": "Disable DTD/ENTITY processing in XML parsers."
+    "description": "Dynamic code via Function constructor",
+    "remediation": "Avoid new Function(); use static code."
   },
   {
-    "name": "Shell curl + sh",
-    "pattern": "curl.*\\|\\s*sh",
-    "severity": "HIGH",
-    "category": "A08",
-    "description": "curl | sh",
-    "remediation": "Download, verify, then exec."
-  },
-  {
-    "name": "Python YAML load",
-    "pattern": "(?i)yaml\\.load\\(",
-    "severity": "HIGH",
-    "category": "A08",
-    "description": "Unsafe YAML load",
-    "remediation": "Use yaml.safe_load instead."
-  },
-  {
-    "name": "SSTI Jinja2 Environment",
-    "pattern": "(?i)jinja2\\.Environment\\(",
-    "severity": "HIGH",
+    "name": "JS eval with template literals",
+    "pattern": "(?i)eval\\(",
+    "severity": "CRITICAL",
     "category": "A03",
-    "description": "Potential SSTI via Jinja2 Environment",
-    "remediation": "Avoid dynamic template creation."
-  },
-  {
-    "name": "Known Vuln Lib",
-    "pattern": "(?i)(flask==0\\.10|lodash@3)",
-    "severity": "HIGH",
-    "category": "A06",
-    "description": "Vulnerable library version",
-    "remediation": "Update dependencies."
-  },
-  {
-    "name": "Java Deserialization",
-    "pattern": "(?i)new\\s+ObjectInputStream\\(",
-    "severity": "HIGH",
-    "category": "A08",
-    "description": "Java deserialization vulnerability",
-    "remediation": "Avoid native deserialization; use safe formats."
-  },
-  {
-    "name": "Sensitive Data in Logs",
-    "pattern": "(?i)(console\\.(log|info|error)|logger\\.(info|error)).*\\b(pass(word)?|token|secret|ssn)\\b",
-    "severity": "HIGH",
-    "category": "A09",
-    "description": "Credentials or PII in logs",
-    "remediation": "Mask or remove sensitive data from logs."
-  },
-  {
-    "name": "Java Servlet getHeader",
-    "pattern": "(?i)request\\.getHeader\\(",
-    "severity": "HIGH",
-    "category": "A01",
-    "description": "Header input unchecked",
-    "remediation": "Validate & sanitize headers."
-  },
-  {
-    "name": "Java PreparedStatement Concatenation",
-    "pattern": "(?i)createStatement\\(\\)\\.executeQuery\\(\".*\"\\s*\\+\\s*.*\\)",
-    "severity": "HIGH",
-    "category": "A03",
-    "description": "SQL concatenation",
-    "remediation": "Use parameterized queries."
-  },
-  {
-    "name": "Python urllib urlopen",
-    "pattern": "(?i)urllib\\.request\\.urlopen\\(",
-    "severity": "HIGH",
-    "category": "A10",
-    "description": "urlopen()",
-    "remediation": "Whitelist URLs/domains."
-  },
-  {
-    "name": "Raw Jinja2",
-    "pattern": "(?i){{\\s*[^}]+\\s*}}",
-    "severity": "HIGH",
-    "category": "A07",
-    "description": "Unescaped template",
-    "remediation": "Use safe filters or escape."
-  },
-  {
-    "name": "GraphQL Injection",
-    "pattern": "(?i)gql(?:['\"])\\s*\\$\\{(?:[^\\}]*?)\\}",
-    "severity": "HIGH",
-    "category": "A03",
-    "description": "GraphQL injection vulnerability",
-    "remediation": "Use GraphQL variables instead of interpolation."
-  },
-  {
-    "name": "Weak Encryption Key Size",
-    "pattern": "(?i)(?:key(?:length|size|bits)\\s*=\\s*(?:512|1024)|RSA\\.\\w+\\(\\s*(?:512|1024)\\s*\\))",
-    "severity": "HIGH",
-    "category": "A02",
-    "description": "Insufficient encryption key size",
-    "remediation": "Use at least 2048-bit RSA, 256-bit ECC."
-  },
-  {
-    "name": "Hardcoded Password",
-    "pattern": "(?i)password\\s*=\\s*[\"'][^\"']+[\"']",
-    "severity": "HIGH",
-    "category": "A02",
-    "description": "Credentials in code",
-    "remediation": "Use environment variables or vaults."
-  },
-  {
-    "name": "Go: exec w/ download",
-    "pattern": "(?i)http\\.Get.*\\|\\s*exec\\.Command",
-    "severity": "HIGH",
-    "category": "A08",
-    "description": "Exec downloaded code",
-    "remediation": "Verify & sign before exec."
-  },
-  {
-    "name": "Python pickle load",
-    "pattern": "(?i)pickle\\.load\\(",
-    "severity": "HIGH",
-    "category": "A08",
-    "description": "pickle.load()",
-    "remediation": "Avoid pickle; use safe formats."
-  },
-  {
-    "name": "Go FormValue",
-    "pattern": "(?i)r\\.FormValue\\(",
-    "severity": "HIGH",
-    "category": "A01",
-    "description": "Unvalidated form input",
-    "remediation": "Validate & sanitize all form inputs."
-  },
-  {
-    "name": "Java getParameter",
-    "pattern": "(?i)request\\.getParameter\\(",
-    "severity": "HIGH",
-    "category": "A01",
-    "description": "Unvalidated request parameter",
-    "remediation": "Use input validation frameworks."
-  },
-  {
-    "name": "jQuery .html()",
-    "pattern": "(?i)\\$\\(.+\\)\\.html\\(",
-    "severity": "HIGH",
-    "category": "A07",
-    "description": "jQuery .html()",
-    "remediation": "Use .text() or sanitize."
-  },
-  {
-    "name": "Path Traversal",
-    "pattern": "(?i)\\.\\./\\.\\./",
-    "severity": "HIGH",
-    "category": "A05",
-    "description": "Potential path traversal",
-    "remediation": "Validate and canonicalize file paths."
-  },
-  {
-    "name": "Node req.query/body",
-    "pattern": "(?i)(req\\.body|req\\.query)\\s*[\\.\\[]",
-    "severity": "HIGH",
-    "category": "A01",
-    "description": "Unvalidated Node.js request input",
-    "remediation": "Use libraries like joi or express-validator."
-  },
-  {
-    "name": "API Key",
-    "pattern": "(?i)(api[_-]?key|secret)\\s*=\\s*[\"'][^\"']+[\"']",
-    "severity": "HIGH",
-    "category": "A02",
-    "description": "API key in code",
-    "remediation": "Use secure secret storage."
-  },
-  {
-    "name": "Python SSRF",
-    "pattern": "requests\\.get\\([^)]+\\)",
-    "severity": "HIGH",
-    "category": "A10",
-    "description": "Unvalidated requests.get",
-    "remediation": "Whitelist URLs/domains."
-  },
-  {
-    "name": "Go SSRF",
-    "pattern": "http\\.Get\\([^)]+\\)",
-    "severity": "HIGH",
-    "category": "A10",
-    "description": "Unvalidated http.Get",
-    "remediation": "Whitelist URLs/domains."
-  },
-  {
-    "name": "Go Old Gin Version",
-    "pattern": "github\\.com/gin-gonic/gin v1\\.3\\.\\d+",
-    "severity": "HIGH",
-    "category": "A06",
-    "description": "Old Gin framework",
-    "remediation": "Upgrade Gin to latest."
-  },
-  {
-    "name": "Python Vulnerable Templating",
-    "pattern": "(?i)(?:Template\\s*\\(.*request|render_template_string\\()",
-    "severity": "HIGH",
-    "category": "A03",
-    "description": "Template injection vulnerability",
-    "remediation": "Never pass user data directly to templates."
-  },
-  {
-    "name": "Old jQuery",
-    "pattern": "jquery-1\\.(3|4|5|6|7|8|9)",
-    "severity": "HIGH",
-    "category": "A06",
-    "description": "Legacy jQuery",
-    "remediation": "Upgrade to latest jQuery."
-  },
-  {
-    "name": "JWT Secret",
-    "pattern": "(?i)(jwt.*secret|signingkey)\\s*=\\s*[\"'][^\"']+[\"']",
-    "severity": "HIGH",
-    "category": "A02",
-    "description": "JWT secret in code",
-    "remediation": "Use env-vars or vaults."
-  },
-  {
-    "name": "TLS SkipVerify",
-    "pattern": "(?i)InsecureSkipVerify\\s*:\\s*true",
-    "severity": "HIGH",
-    "category": "A05",
-    "description": "TLS Verify disabled",
-    "remediation": "Enable certificate validation."
-  },
-  {
-    "name": "LDAP Injection",
-    "pattern": "(?i)ldap\\.search(?:Request)?\\s*\\(.+\\+.+\\)",
-    "severity": "HIGH",
-    "category": "A03",
-    "description": "LDAP injection vulnerability",
-    "remediation": "Escape LDAP special characters."
-  },
-  {
-    "name": "Spring Security Disabled",
-    "pattern": "(?i)http\\.csrf\\(\\)\\.disable\\(\\)",
-    "severity": "HIGH",
-    "category": "A01",
-    "description": "CSRF disabled",
-    "remediation": "Enable CSRF protection."
-  },
-  {
-    "name": "Python Flask Markup Unsafe",
-    "pattern": "(?i)Markup\\(.*\\)",
-    "severity": "HIGH",
-    "category": "A07",
-    "description": "Flask Markup()",
-    "remediation": "Use safe rendering; escape data."
-  },
-  {
-    "name": "Java URL openStream",
-    "pattern": "(?i)new\\s+URL\\([^)]*\\)\\.openStream\\(",
-    "severity": "HIGH",
-    "category": "A10",
-    "description": "URL.openStream",
-    "remediation": "Whitelist remote endpoints."
-  },
-  {
-    "name": "Flask Input",
-    "pattern": "(?i)(request\\.args|getattr\\(request, )",
-    "severity": "HIGH",
-    "category": "A01",
-    "description": "Unvalidated Flask input",
-    "remediation": "Validate Flask request data explicitly."
-  },
-  {
-    "name": "Hardcoded RSA Key",
-    "pattern": "(?i)privateKey\\s*=\\s*[\"'][^\"']+[\"']",
-    "severity": "HIGH",
-    "category": "A02",
-    "description": "RSA key in code",
-    "remediation": "Use secure key mgmt."
-  },
-  {
-    "name": "Go html/template Unsafe",
-    "pattern": "(?i)template\\.HTML\\(",
-    "severity": "HIGH",
-    "category": "A07",
-    "description": "template.HTML use",
-    "remediation": "Use auto-escaping templates."
-  },
-  {
-    "name": "SQL String Concatenation",
-    "pattern": "(?i)(?:query|sql|db\\.)(?:Execute|Query)\\s*\\(\\s*(?:[f]?[\"']SELECT|[f]?[\"']INSERT|[f]?[\"']UPDATE|[f]?[\"']DELETE).*?\\+.*?\\)",
-    "severity": "HIGH",
-    "category": "A03",
-    "description": "SQL injection via concatenation",
-    "remediation": "Use parameterized queries."
-  },
-  {
-    "name": "Dependency Confusion Install Command",
-    "pattern": "(?i)(npm\\s+install|pip\\s+install|go\\s+get)\\s+http://",
-    "severity": "HIGH",
-    "category": "A08",
-    "description": "Installing packages over HTTP",
-    "remediation": "Use only HTTPS package registries."
-  },
-  {
-    "name": "Old AngularJS",
-    "pattern": "angular\\.module\\(",
-    "severity": "HIGH",
-    "category": "A06",
-    "description": "Legacy AngularJS",
-    "remediation": "Migrate to Angular 2+."
-  },
-  {
-    "name": "Python Requests Old Version",
-    "pattern": "requests==2\\.18\\.\\d+",
-    "severity": "HIGH",
-    "category": "A06",
-    "description": "Old requests lib",
-    "remediation": "Upgrade requests package."
-  },
-  {
-    "name": "JS document.cookie",
-    "pattern": "(?i)document\\.cookie",
-    "severity": "HIGH",
-    "category": "A07",
-    "description": "Cookie access in JS",
-    "remediation": "Avoid direct cookie use; use HttpOnly."
-  },
-  {
-    "name": "Go Missing Auth Check",
-    "pattern": "(?i)http\\.HandleFunc\\([\"'][^\"']+[\"'],\\s*func\\s*\\([^)]+\\)\\s*{.*return\\s*\\}",
-    "severity": "HIGH",
-    "category": "A01",
-    "description": "Endpoint without proper authentication",
-    "remediation": "Implement authentication middleware."
-  },
-  {
-    "name": "Hardcoded IV",
-    "pattern": "(?i)(?:iv\\s*=\\s*[\"'][0-9a-f]+[\"']|InitializationVector\\s*\\(\\s*[\"'][0-9a-f]+[\"']\\))",
-    "severity": "HIGH",
-    "category": "A02",
-    "description": "Hardcoded initialization vector",
-    "remediation": "Generate fresh IVs for each operation."
-  },
-  {
-    "name": "Angular Direct DOM Access",
-    "pattern": "(?i)(?:bypassSecurityTrust\\w+)",
-    "severity": "HIGH",
-    "category": "A01",
-    "description": "Angular security bypass",
-    "remediation": "Avoid sanitization bypass."
-  },
-  {
-    "name": "CRLF Injection",
-    "pattern": "(?i)(%0d%0a|\\\\r\\\\n)",
-    "severity": "HIGH",
-    "category": "A03",
-    "description": "CRLF injection risk",
-    "remediation": "Strip or encode newline sequences."
-  },
-  {
-    "name": "Weak Cipher",
-    "pattern": "(?i)Cipher\\.getInstance\\([\"']?(DES|RC4|MD5|SHA1)[\"']?\\)",
-    "severity": "HIGH",
-    "category": "A02",
-    "description": "Weak cipher use",
-    "remediation": "Use AES-GCM or better."
-  },
-  {
-    "name": "Node.js http.request",
-    "pattern": "(?i)http\\.request\\(",
-    "severity": "HIGH",
-    "category": "A10",
-    "description": "http.request",
-    "remediation": "Whitelist URLs/domains."
-  },
-  {
-    "name": "Go net/http Get",
-    "pattern": "(?i)http\\.Get\\(",
-    "severity": "HIGH",
-    "category": "A10",
-    "description": "http.Get()",
-    "remediation": "Whitelist URLs/domains."
-  },
-  {
-    "name": "Java Debug Enabled",
-    "pattern": "(?i)spring\\.boot\\.devtools\\.restart\\.enabled\\s*=\\s*true",
-    "severity": "MEDIUM",
-    "category": "A05",
-    "description": "Devtools in prod",
-    "remediation": "Disable devtools in prod."
-  },
-  {
-    "name": "Missing HttpOnly/Secure Cookie",
-    "pattern": "(?i)Set-Cookie:",
-    "severity": "MEDIUM",
-    "category": "A05",
-    "description": "Insecure cookie flags",
-    "remediation": "Set HttpOnly and Secure flags on cookies."
-  },
-  {
-    "name": "Go crypto/md5",
-    "pattern": "(?i)md5\\.New\\(",
-    "severity": "MEDIUM",
-    "category": "A02",
-    "description": "crypto/md5",
-    "remediation": "Use crypto/sha256."
-  },
-  {
-    "name": "SHA1",
-    "pattern": "(?i)sha1\\s*\\(",
-    "severity": "MEDIUM",
-    "category": "A02",
-    "description": "Weak SHA1 hash",
-    "remediation": "Use SHA-256 or better."
-  },
-  {
-    "name": "Missing CSP Header",
-    "pattern": "(?i)Content-Security-Policy:\\s*",
-    "severity": "MEDIUM",
-    "category": "A05",
-    "description": "CSP header missing",
-    "remediation": "Define a strict CSP to lock down scripts/styles."
-  },
-  {
-    "name": "Weak PBKDF2 Iteration Count",
-    "pattern": "(?i)pbkdf2.*(?:iterations|count)\\s*[<=]\\s*10000",
-    "severity": "MEDIUM",
-    "category": "A02",
-    "description": "Low PBKDF2 iteration count",
-    "remediation": "Use ≥100k iterations for PBKDF2."
-  },
-  {
-    "name": "Go json.Unmarshal unchecked",
-    "pattern": "(?i)json\\.Unmarshal\\(",
-    "severity": "MEDIUM",
-    "category": "A08",
-    "description": "json.Unmarshal",
-    "remediation": "Validate JSON before unmarshal."
-  },
-  {
-    "name": "Weak Random Generation",
-    "pattern": "(?i)(?:Math\\.random\\(\\)|rand\\.Intn\\(|random\\.random\\(\\))",
-    "severity": "MEDIUM",
-    "category": "A02",
-    "description": "Non-cryptographic random generator",
-    "remediation": "Use secure random functions."
-  },
-  {
-    "name": "Node.js Express Error Handler",
-    "pattern": "(?i)app\\.use\\(errorHandler\\)",
-    "severity": "MEDIUM",
-    "category": "A05",
-    "description": "Default error handler",
-    "remediation": "Use custom error handler."
-  },
-  {
-    "name": "Open Redirect",
-    "pattern": "(?i)(sendRedirect|res\\.redirect)\\(",
-    "severity": "MEDIUM",
-    "category": "A01",
-    "description": "Redirect without validation",
-    "remediation": "Whitelist redirect URLs."
-  },
-  {
-    "name": "Flask Debug",
-    "pattern": "(?i)app\\.run\\(.*debug\\s*=\\s*True",
-    "severity": "MEDIUM",
-    "category": "A05",
-    "description": "Debug mode on",
-    "remediation": "Disable debug in prod."
-  },
-  {
-    "name": "document.write",
-    "pattern": "(?i)document\\.write\\s*\\(",
-    "severity": "MEDIUM",
-    "category": "A07",
-    "description": "document.write used",
-    "remediation": "Avoid document.write()."
-  },
-  {
-    "name": "Rails Mass Assignment",
-    "pattern": "(?i)params\\.permit\\(",
-    "severity": "MEDIUM",
-    "category": "A01",
-    "description": "Potential mass assignment",
-    "remediation": "Whitelist permitted fields explicitly."
-  },
-  {
-    "name": "Python hashlib md5",
-    "pattern": "(?i)hashlib\\.md5\\(",
-    "severity": "MEDIUM",
-    "category": "A02",
-    "description": "hashlib.md5",
-    "remediation": "Use hashlib.sha256."
-  },
-  {
-    "name": "JWT No Expiration",
-    "pattern": "(?i)(?:jwt\\.sign\\(|jwt\\.create\\(|token\\.add).*\\)",
-    "severity": "MEDIUM",
-    "category": "A01",
-    "description": "JWT without expiration",
-    "remediation": "Always set appropriate token expiration."
-  },
-  {
-    "name": "Open CORS Policy",
-    "pattern": "(?i)Access-Control-Allow-Origin:\\s*\\*",
-    "severity": "MEDIUM",
-    "category": "A05",
-    "description": "CORS policy allows any origin",
-    "remediation": "Restrict CORS to trusted domains."
-  },
-  {
-    "name": "Missing X-Content-Type-Options",
-    "pattern": "(?i)X-Content-Type-Options:\\s*nosniff",
-    "severity": "MEDIUM",
-    "category": "A05",
-    "description": "X-Content-Type-Options header missing",
-    "remediation": "Add `X-Content-Type-Options: nosniff`."
-  },
-  {
-    "name": "No Rate Limiting on Auth",
-    "pattern": "(?i)(POST|GET)\\s*/\\S*(login|auth|signin)\\b",
-    "severity": "MEDIUM",
-    "category": "A04",
-    "description": "Auth endpoint lacks rate limiting",
-    "remediation": "Apply rate limiting/throttling to auth endpoints."
-  },
-  {
-    "name": "Inline JS Handler",
-    "pattern": "(?i)on\\w+\\s*=\\s*[\"'].*[\"']",
-    "severity": "MEDIUM",
-    "category": "A07",
-    "description": "Inline JS event",
-    "remediation": "Use addEventListener()."
-  },
-  {
-    "name": "Exceptions Caught Without Logging",
-    "pattern": "(?i)catch\\s*\\([^)]*\\)\\s*\\{",
-    "severity": "MEDIUM",
-    "category": "A09",
-    "description": "Exception handler lacks logging",
-    "remediation": "Log caught exceptions (e.g. `console.error(err)`)."
-  },
-  {
-    "name": "Hardcoded IP Address",
-    "pattern": "(?i)\\b((?:25[0-5]|2[0-4]\\d|[01]?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|[01]?\\d?\\d)){3})\\b",
-    "severity": "MEDIUM",
-    "category": "A05",
-    "description": "Hardcoded IPv4 address",
-    "remediation": "Use DNS names or config management for IPs."
-  },
-  {
-    "name": "MD5",
-    "pattern": "(?i)md5\\s*\\(",
-    "severity": "MEDIUM",
-    "category": "A02",
-    "description": "Weak MD5 hash",
-    "remediation": "Use SHA-256 or better."
-  },
-  {
-    "name": "Missing HSTS Header",
-    "pattern": "(?i)Strict-Transport-Security:\\s*max-age=\\d+",
-    "severity": "MEDIUM",
-    "category": "A05",
-    "description": "HSTS header missing",
-    "remediation": "Add `Strict-Transport-Security: max-age=63072000; includeSubDomains`."
-  },
-  {
-    "name": "Missing X-Frame-Options",
-    "pattern": "(?i)X-Frame-Options:\\s*(DENY|SAMEORIGIN)",
-    "severity": "MEDIUM",
-    "category": "A05",
-    "description": "X-Frame-Options header missing",
-    "remediation": "Add `X-Frame-Options: DENY` or `SAMEORIGIN`."
+    "description": "eval() - direct code execution",
+    "remediation": "Avoid eval(); use safe parsing."
   },
   {
     "name": "MongoDB NoSQL Injection",
@@ -736,6 +88,94 @@
     "remediation": "Use parameterized queries, avoid $where operator."
   },
   {
+    "name": "PHP Unserialize",
+    "pattern": "(?i)unserialize\\s*\\(",
+    "severity": "CRITICAL",
+    "category": "A03",
+    "description": "Untrusted data passed to unserialize()",
+    "remediation": "Avoid PHP unserialize; use JSON or safe parsers."
+  },
+  {
+    "name": "Python os.system",
+    "pattern": "(?i)os\\.system\\(",
+    "severity": "CRITICAL",
+    "category": "A03",
+    "description": "os.system call - direct shell execution",
+    "remediation": "Use subprocess with shell=False."
+  },
+  {
+    "name": "Remote Code Execution PHP",
+    "pattern": "(?i)(\\$_(?:GET|POST|REQUEST)\\s*\\[.*\\].*(?:file_get_contents|include|require)|create_function\\s*\\()",
+    "severity": "CRITICAL",
+    "category": "A03",
+    "description": "PHP RCE pattern",
+    "remediation": "Validate and sanitize all user input."
+  },
+  {
+    "name": "SQL Injection Obvious",
+    "pattern": "(?i)(union\\s+select.*from|' or '1'='1|' or 1=1|admin'--)",
+    "severity": "CRITICAL",
+    "category": "A03",
+    "description": "Obvious SQL injection pattern",
+    "remediation": "Use parameterized queries immediately."
+  },
+  {
+    "name": "Web Shell Pattern",
+    "pattern": "(?i)(\\$_(?:GET|POST|REQUEST)\\s*\\[.*\\].*(?:eval|system|exec)|assert\\s*\\(\\s*\\$_)",
+    "severity": "CRITICAL",
+    "category": "A03",
+    "description": "PHP web shell pattern",
+    "remediation": "Remove web shell immediately."
+  },
+  {
+    "name": "Direct System File Access",
+    "pattern": "(?i)(/etc/passwd|/etc/shadow|/etc/hosts|C:\\\\Windows\\\\System32)",
+    "severity": "CRITICAL",
+    "category": "A05",
+    "description": "Direct system file access",
+    "remediation": "Avoid direct system file manipulation."
+  },
+  {
+    "name": "XSS Obvious",
+    "pattern": "(?i)(<script>alert\\(|<img.*onerror=|javascript:alert\\()",
+    "severity": "CRITICAL",
+    "category": "A07",
+    "description": "Obvious XSS payload",
+    "remediation": "Sanitize and escape all user input."
+  },
+  {
+    "name": "Backdoor Shell Command",
+    "pattern": "(?i)(nc\\s+-l|netcat.*-l|bash\\s+-i|sh\\s+-i|/bin/sh.*-i)",
+    "severity": "CRITICAL",
+    "category": "A08",
+    "description": "Reverse shell/backdoor pattern",
+    "remediation": "Remove malicious code immediately."
+  },
+  {
+    "name": "Buffer Overflow Pattern",
+    "pattern": "(?i)(strcpy\\s*\\(|gets\\s*\\(|sprintf\\s*\\(.*%s)",
+    "severity": "CRITICAL",
+    "category": "A08",
+    "description": "Buffer overflow vulnerable function",
+    "remediation": "Use safe string functions (strncpy, fgets, snprintf)."
+  },
+  {
+    "name": "Crypto Mining",
+    "pattern": "(?i)(stratum\\+tcp|mining\\.pool|xmrig|monero|bitcoin.*pool|cryptonight)",
+    "severity": "CRITICAL",
+    "category": "A08",
+    "description": "Cryptocurrency mining code",
+    "remediation": "Remove unauthorized mining code."
+  },
+  {
+    "name": "Malicious Domain",
+    "pattern": "(?i)(evil\\.com|malware\\.site|c2\\.server|badactor\\.net)",
+    "severity": "CRITICAL",
+    "category": "A08",
+    "description": "Known malicious domain reference",
+    "remediation": "Remove malicious domain references."
+  },
+  {
     "name": "Unrestricted File Upload",
     "pattern": "(?i)(move_uploaded_file|file_get_contents\\(\\$_FILES|uploadedfile\\.save)",
     "severity": "CRITICAL",
@@ -744,12 +184,252 @@
     "remediation": "Validate file types, scan uploads, restrict execution."
   },
   {
+    "name": "XStream Deserialization",
+    "pattern": "(?i)new\\s+XStream\\s*\\(",
+    "severity": "CRITICAL",
+    "category": "A08",
+    "description": "XStream deserialization can lead to RCE",
+    "remediation": "Disable untrusted types or use safe libraries."
+  },
+  {
+    "name": "Data Exfiltration",
+    "pattern": "(?i)(curl.*-X\\s+POST.*\\.(pastebin|hastebin|discord|telegram)|wget.*evil|base64.*decode.*sh)",
+    "severity": "CRITICAL",
+    "category": "A09",
+    "description": "Potential data exfiltration",
+    "remediation": "Investigate and remove malicious code."
+  },
+  {
+    "name": "Angular Direct DOM Access",
+    "pattern": "(?i)(?:bypassSecurityTrust\\w+)",
+    "severity": "HIGH",
+    "category": "A01",
+    "description": "Angular security bypass",
+    "remediation": "Avoid sanitization bypass."
+  },
+  {
     "name": "Direct Object Reference",
     "pattern": "(?i)(SELECT.*WHERE\\s+id\\s*=|users/\\{\\w+\\}|/user/\\d+)",
     "severity": "HIGH",
     "category": "A01",
     "description": "Potential IDOR vulnerability",
     "remediation": "Implement proper authorization checks."
+  },
+  {
+    "name": "Flask Input",
+    "pattern": "(?i)(request\\.args|getattr\\(request, )",
+    "severity": "HIGH",
+    "category": "A01",
+    "description": "Unvalidated Flask input",
+    "remediation": "Validate Flask request data explicitly."
+  },
+  {
+    "name": "Go FormValue",
+    "pattern": "(?i)r\\.FormValue\\(",
+    "severity": "HIGH",
+    "category": "A01",
+    "description": "Unvalidated form input",
+    "remediation": "Validate & sanitize all form inputs."
+  },
+  {
+    "name": "Go Missing Auth Check",
+    "pattern": "(?i)http\\.HandleFunc\\([\"'][^\"']+[\"'],\\s*func\\s*\\([^)]+\\)\\s*{.*return\\s*\\}",
+    "severity": "HIGH",
+    "category": "A01",
+    "description": "Endpoint without proper authentication",
+    "remediation": "Implement authentication middleware."
+  },
+  {
+    "name": "Insecure File Permissions",
+    "pattern": "(?i)chmod\\s+0?777",
+    "severity": "HIGH",
+    "category": "A01",
+    "description": "Files made world-writable",
+    "remediation": "Use least-privilege permissions."
+  },
+  {
+    "name": "Java Servlet getHeader",
+    "pattern": "(?i)request\\.getHeader\\(",
+    "severity": "HIGH",
+    "category": "A01",
+    "description": "Header input unchecked",
+    "remediation": "Validate & sanitize headers."
+  },
+  {
+    "name": "Java getParameter",
+    "pattern": "(?i)request\\.getParameter\\(",
+    "severity": "HIGH",
+    "category": "A01",
+    "description": "Unvalidated request parameter",
+    "remediation": "Use input validation frameworks."
+  },
+  {
+    "name": "Node req.query/body",
+    "pattern": "(?i)(req\\.body|req\\.query)\\s*[\\.\\[]",
+    "severity": "HIGH",
+    "category": "A01",
+    "description": "Unvalidated Node.js request input",
+    "remediation": "Use libraries like joi or express-validator."
+  },
+  {
+    "name": "Spring Security Disabled",
+    "pattern": "(?i)http\\.csrf\\(\\)\\.disable\\(\\)",
+    "severity": "HIGH",
+    "category": "A01",
+    "description": "CSRF disabled",
+    "remediation": "Enable CSRF protection."
+  },
+  {
+    "name": "AES ECB Mode",
+    "pattern": "(?i)AES/ECB/NoPadding",
+    "severity": "HIGH",
+    "category": "A02",
+    "description": "AES in ECB mode is insecure",
+    "remediation": "Use CBC or GCM modes with IV."
+  },
+  {
+    "name": "API Key",
+    "pattern": "(?i)(api[_-]?key|secret)\\s*=\\s*[\"'][^\"']+[\"']",
+    "severity": "HIGH",
+    "category": "A02",
+    "description": "API key in code",
+    "remediation": "Use secure secret storage."
+  },
+  {
+    "name": "Hardcoded IV",
+    "pattern": "(?i)(?:iv\\s*=\\s*[\"'][0-9a-f]+[\"']|InitializationVector\\s*\\(\\s*[\"'][0-9a-f]+[\"']\\))",
+    "severity": "HIGH",
+    "category": "A02",
+    "description": "Hardcoded initialization vector",
+    "remediation": "Generate fresh IVs for each operation."
+  },
+  {
+    "name": "Hardcoded Password",
+    "pattern": "(?i)password\\s*=\\s*[\"'][^\"']+[\"']",
+    "severity": "HIGH",
+    "category": "A02",
+    "description": "Credentials in code",
+    "remediation": "Use environment variables or vaults."
+  },
+  {
+    "name": "Hardcoded RSA Key",
+    "pattern": "(?i)privateKey\\s*=\\s*[\"'][^\"']+[\"']",
+    "severity": "HIGH",
+    "category": "A02",
+    "description": "RSA key in code",
+    "remediation": "Use secure key mgmt."
+  },
+  {
+    "name": "JWT Secret",
+    "pattern": "(?i)(jwt.*secret|signingkey)\\s*=\\s*[\"'][^\"']+[\"']",
+    "severity": "HIGH",
+    "category": "A02",
+    "description": "JWT secret in code",
+    "remediation": "Use env-vars or vaults."
+  },
+  {
+    "name": "Weak Cipher",
+    "pattern": "(?i)Cipher\\.getInstance\\([\"']?(DES|RC4|MD5|SHA1)[\"']?\\)",
+    "severity": "HIGH",
+    "category": "A02",
+    "description": "Weak cipher use",
+    "remediation": "Use AES-GCM or better."
+  },
+  {
+    "name": "Weak Encryption Key Size",
+    "pattern": "(?i)(?:key(?:length|size|bits)\\s*=\\s*(?:512|1024)|RSA\\.\\w+\\(\\s*(?:512|1024)\\s*\\))",
+    "severity": "HIGH",
+    "category": "A02",
+    "description": "Insufficient encryption key size",
+    "remediation": "Use at least 2048-bit RSA, 256-bit ECC."
+  },
+  {
+    "name": "CRLF Injection",
+    "pattern": "(?i)(%0d%0a|\\\\r\\\\n)",
+    "severity": "HIGH",
+    "category": "A03",
+    "description": "CRLF injection risk",
+    "remediation": "Strip or encode newline sequences."
+  },
+  {
+    "name": "GraphQL Injection",
+    "pattern": "(?i)gql(?:['\"])\\s*\\$\\{(?:[^\\}]*?)\\}",
+    "severity": "HIGH",
+    "category": "A03",
+    "description": "GraphQL injection vulnerability",
+    "remediation": "Use GraphQL variables instead of interpolation."
+  },
+  {
+    "name": "Java PreparedStatement Concatenation",
+    "pattern": "(?i)createStatement\\(\\)\\.executeQuery\\(\".*\"\\s*\\+\\s*.*\\)",
+    "severity": "HIGH",
+    "category": "A03",
+    "description": "SQL concatenation",
+    "remediation": "Use parameterized queries."
+  },
+  {
+    "name": "LDAP Injection",
+    "pattern": "(?i)ldap\\.search(?:Request)?\\s*\\(.+\\+.+\\)",
+    "severity": "HIGH",
+    "category": "A03",
+    "description": "LDAP injection vulnerability",
+    "remediation": "Escape LDAP special characters."
+  },
+  {
+    "name": "Log Injection",
+    "pattern": "(?i)log\\.(info|warn|error|debug)\\s*\\(.*(\\n|%0a|%0d).*",
+    "severity": "HIGH",
+    "category": "A03",
+    "description": "Newline characters are being logged, which can lead to log injection or log spoofing.",
+    "remediation": "Sanitize all data before logging to remove or encode newline characters."
+  },
+  {
+    "name": "Python Vulnerable Templating",
+    "pattern": "(?i)(?:Template\\s*\\(.*request|render_template_string\\()",
+    "severity": "HIGH",
+    "category": "A03",
+    "description": "Template injection vulnerability",
+    "remediation": "Never pass user data directly to templates."
+  },
+  {
+    "name": "SQL String Concatenation",
+    "pattern": "(?i)(?:query|sql|db\\.)(?:Execute|Query)\\s*\\(\\s*(?:[f]?[\"']SELECT|[f]?[\"']INSERT|[f]?[\"']UPDATE|[f]?[\"']DELETE).*?\\+.*?\\)",
+    "severity": "HIGH",
+    "category": "A03",
+    "description": "SQL injection via concatenation",
+    "remediation": "Use parameterized queries."
+  },
+  {
+    "name": "SSTI Jinja2 Environment",
+    "pattern": "(?i)jinja2\\.Environment\\(",
+    "severity": "HIGH",
+    "category": "A03",
+    "description": "Potential SSTI via Jinja2 Environment",
+    "remediation": "Avoid dynamic template creation."
+  },
+  {
+    "name": "XXE/XML External Entity",
+    "pattern": "(?i)<!DOCTYPE\\s+[^>]*\\s+SYSTEM\\s+[\"'][^\"']+[\"']",
+    "severity": "HIGH",
+    "category": "A03",
+    "description": "Possible XXE declaration",
+    "remediation": "Disable DTD/ENTITY processing in XML parsers."
+  },
+  {
+    "name": "Open CORS in Spring",
+    "pattern": "(?i)allowedOrigins\\s*=\\s*\"\\*\"",
+    "severity": "HIGH",
+    "category": "A05",
+    "description": "CORS allows any origin",
+    "remediation": "Restrict CORS to specific domains."
+  },
+  {
+    "name": "Path Traversal",
+    "pattern": "(?i)\\.\\./\\.\\./",
+    "severity": "HIGH",
+    "category": "A05",
+    "description": "Potential path traversal",
+    "remediation": "Validate and canonicalize file paths."
   },
   {
     "name": "Session Cookie",
@@ -768,60 +448,36 @@
     "remediation": "Validate and canonicalize file paths."
   },
   {
-    "name": "PHP Unserialize",
-    "pattern": "(?i)unserialize\\s*\\(",
-    "severity": "CRITICAL",
-    "category": "A03",
-    "description": "Untrusted data passed to unserialize()",
-    "remediation": "Avoid PHP unserialize; use JSON or safe parsers."
-  },
-  {
-    "name": "Insecure File Permissions",
-    "pattern": "(?i)chmod\\s+0?777",
-    "severity": "HIGH",
-    "category": "A01",
-    "description": "Files made world-writable",
-    "remediation": "Use least-privilege permissions."
-  },
-  {
-    "name": "AES ECB Mode",
-    "pattern": "(?i)AES/ECB/NoPadding",
-    "severity": "HIGH",
-    "category": "A02",
-    "description": "AES in ECB mode is insecure",
-    "remediation": "Use CBC or GCM modes with IV."
-  },
-  {
-    "name": "JS Function Constructor",
-    "pattern": "(?i)new\\s+Function\\s*\\(",
-    "severity": "CRITICAL",
-    "category": "A03",
-    "description": "Dynamic code via Function constructor",
-    "remediation": "Avoid new Function(); use static code."
-  },
-  {
-    "name": "XStream Deserialization",
-    "pattern": "(?i)new\\s+XStream\\s*\\(",
-    "severity": "CRITICAL",
-    "category": "A08",
-    "description": "XStream deserialization can lead to RCE",
-    "remediation": "Disable untrusted types or use safe libraries."
-  },
-  {
-    "name": "Schema Validation Disabled",
-    "pattern": "(?i)validateSchema\\s*[:=]\\s*false",
-    "severity": "MEDIUM",
-    "category": "A04",
-    "description": "Schema validation turned off",
-    "remediation": "Enable input schema validation."
-  },
-  {
-    "name": "Open CORS in Spring",
-    "pattern": "(?i)allowedOrigins\\s*=\\s*\"\\*\"",
+    "name": "Spring Boot Actuators Exposed",
+    "pattern": "management\\.endpoints\\.web\\.exposure\\.include\\s*=\\s*\\*",
     "severity": "HIGH",
     "category": "A05",
-    "description": "CORS allows any origin",
-    "remediation": "Restrict CORS to specific domains."
+    "description": "Spring Boot Actuator endpoints are exposed to the public, leaking sensitive information.",
+    "remediation": "Restrict actuator endpoint exposure in production environments."
+  },
+  {
+    "name": "TLS SkipVerify",
+    "pattern": "(?i)InsecureSkipVerify\\s*:\\s*true",
+    "severity": "HIGH",
+    "category": "A05",
+    "description": "TLS Verify disabled",
+    "remediation": "Enable certificate validation."
+  },
+  {
+    "name": "Go Old Gin Version",
+    "pattern": "github\\.com/gin-gonic/gin v1\\.3\\.\\d+",
+    "severity": "HIGH",
+    "category": "A06",
+    "description": "Old Gin framework",
+    "remediation": "Upgrade Gin to latest."
+  },
+  {
+    "name": "Known Vuln Lib",
+    "pattern": "(?i)(flask==0\\.10|lodash@3)",
+    "severity": "HIGH",
+    "category": "A06",
+    "description": "Vulnerable library version",
+    "remediation": "Update dependencies."
   },
   {
     "name": "NPM Audit Bypass",
@@ -832,12 +488,148 @@
     "remediation": "Run full audit and fix issues."
   },
   {
+    "name": "Old AngularJS",
+    "pattern": "angular\\.module\\(",
+    "severity": "HIGH",
+    "category": "A06",
+    "description": "Legacy AngularJS",
+    "remediation": "Migrate to Angular 2+."
+  },
+  {
+    "name": "Old jQuery",
+    "pattern": "jquery-1\\.(3|4|5|6|7|8|9)",
+    "severity": "HIGH",
+    "category": "A06",
+    "description": "Legacy jQuery",
+    "remediation": "Upgrade to latest jQuery."
+  },
+  {
+    "name": "Python Requests Old Version",
+    "pattern": "requests==2\\.18\\.\\d+",
+    "severity": "HIGH",
+    "category": "A06",
+    "description": "Old requests lib",
+    "remediation": "Upgrade requests package."
+  },
+  {
     "name": "Auth Disabled",
     "pattern": "(?i)auth\\s*=\\s*false",
     "severity": "HIGH",
     "category": "A07",
     "description": "Authentication turned off in config",
     "remediation": "Require auth for all endpoints."
+  },
+  {
+    "name": "Go html/template Unsafe",
+    "pattern": "(?i)template\\.HTML\\(",
+    "severity": "HIGH",
+    "category": "A07",
+    "description": "template.HTML use",
+    "remediation": "Use auto-escaping templates."
+  },
+  {
+    "name": "JS document.cookie",
+    "pattern": "(?i)document\\.cookie",
+    "severity": "HIGH",
+    "category": "A07",
+    "description": "Cookie access in JS",
+    "remediation": "Avoid direct cookie use; use HttpOnly."
+  },
+  {
+    "name": "Python Flask Markup Unsafe",
+    "pattern": "(?i)Markup\\(.*\\)",
+    "severity": "HIGH",
+    "category": "A07",
+    "description": "Flask Markup()",
+    "remediation": "Use safe rendering; escape data."
+  },
+  {
+    "name": "Raw Jinja2",
+    "pattern": "(?i){{\\s*[^}]+\\s*}}",
+    "severity": "HIGH",
+    "category": "A07",
+    "description": "Unescaped template",
+    "remediation": "Use safe filters or escape."
+  },
+  {
+    "name": "innerHTML",
+    "pattern": "(?i)\\.innerHTML\\s*=",
+    "severity": "HIGH",
+    "category": "A07",
+    "description": "innerHTML assignment",
+    "remediation": "Use textContent or sanitize."
+  },
+  {
+    "name": "jQuery .html()",
+    "pattern": "(?i)\\$\\(.+\\)\\.html\\(",
+    "severity": "HIGH",
+    "category": "A07",
+    "description": "jQuery .html()",
+    "remediation": "Use .text() or sanitize."
+  },
+  {
+    "name": "Dependency Confusion Install Command",
+    "pattern": "(?i)(npm\\s+install|pip\\s+install|go\\s+get)\\s+http://",
+    "severity": "HIGH",
+    "category": "A08",
+    "description": "Installing packages over HTTP",
+    "remediation": "Use only HTTPS package registries."
+  },
+  {
+    "name": "Go: exec w/ download",
+    "pattern": "(?i)http\\.Get.*\\|\\s*exec\\.Command",
+    "severity": "HIGH",
+    "category": "A08",
+    "description": "Exec downloaded code",
+    "remediation": "Verify & sign before exec."
+  },
+  {
+    "name": "Java Deserialization",
+    "pattern": "(?i)new\\s+ObjectInputStream\\(",
+    "severity": "HIGH",
+    "category": "A08",
+    "description": "Java deserialization vulnerability",
+    "remediation": "Avoid native deserialization; use safe formats."
+  },
+  {
+    "name": "JavaScript Prototype Pollution",
+    "pattern": "(__proto__|constructor\\.prototype)",
+    "severity": "HIGH",
+    "category": "A08",
+    "description": "Direct modification of '__proto__' or 'constructor.prototype' can lead to prototype pollution.",
+    "remediation": "Sanitize user input to prevent modification of object prototypes. Use Object.create(null) for maps."
+  },
+  {
+    "name": "Python YAML load",
+    "pattern": "(?i)yaml\\.load\\(",
+    "severity": "HIGH",
+    "category": "A08",
+    "description": "Unsafe YAML load",
+    "remediation": "Use yaml.safe_load instead."
+  },
+  {
+    "name": "Python pickle load",
+    "pattern": "(?i)pickle\\.load\\(",
+    "severity": "HIGH",
+    "category": "A08",
+    "description": "pickle.load()",
+    "remediation": "Avoid pickle; use safe formats."
+  },
+  {
+    "name": "Shell curl + sh",
+    "pattern": "curl.*\\|\\s*sh",
+    "severity": "HIGH",
+    "category": "A08",
+    "description": "curl | sh",
+    "remediation": "Download, verify, then exec."
+  },
+  {
+    "name": "Sensitive Data in Logs",
+    "pattern": "(?i)(console\\.(log|info|error)|logger\\.(info|error)).*\\b(pass(word)?|token|secret|ssn)\\b",
+    "severity": "HIGH",
+    "category": "A09",
+    "description": "Credentials or PII in logs",
+    "remediation": "Mask or remove sensitive data from logs."
   },
   {
     "name": "Silent Catch",
@@ -854,5 +646,277 @@
     "category": "A10",
     "description": "Potential SSRF via axios request",
     "remediation": "Whitelist/validate external URLs."
+  },
+  {
+    "name": "Go SSRF",
+    "pattern": "http\\.Get\\([^)]+\\)",
+    "severity": "HIGH",
+    "category": "A10",
+    "description": "Unvalidated http.Get",
+    "remediation": "Whitelist URLs/domains."
+  },
+  {
+    "name": "Go net/http Get",
+    "pattern": "(?i)http\\.Get\\(",
+    "severity": "HIGH",
+    "category": "A10",
+    "description": "http.Get()",
+    "remediation": "Whitelist URLs/domains."
+  },
+  {
+    "name": "Java URL openStream",
+    "pattern": "(?i)new\\s+URL\\([^)]*\\)\\.openStream\\(",
+    "severity": "HIGH",
+    "category": "A10",
+    "description": "URL.openStream",
+    "remediation": "Whitelist remote endpoints."
+  },
+  {
+    "name": "Node.js http.request",
+    "pattern": "(?i)http\\.request\\(",
+    "severity": "HIGH",
+    "category": "A10",
+    "description": "http.request",
+    "remediation": "Whitelist URLs/domains."
+  },
+  {
+    "name": "Python SSRF",
+    "pattern": "requests\\.get\\([^)]+\\)",
+    "severity": "HIGH",
+    "category": "A10",
+    "description": "Unvalidated requests.get",
+    "remediation": "Whitelist URLs/domains."
+  },
+  {
+    "name": "Python urllib urlopen",
+    "pattern": "(?i)urllib\\.request\\.urlopen\\(",
+    "severity": "HIGH",
+    "category": "A10",
+    "description": "urlopen()",
+    "remediation": "Whitelist URLs/domains."
+  },
+  {
+    "name": "Express.js IDOR Pattern",
+    "pattern": "app\\.(get|post|put|delete)\\s*\\(['\"]/[^'\"/]+/:\\w+",
+    "severity": "MEDIUM",
+    "category": "A01",
+    "description": "Potential Insecure Direct Object Reference (IDOR) pattern in Express.js route.",
+    "remediation": "Ensure that all routes handling object IDs have strict authorization checks."
+  },
+  {
+    "name": "JWT No Expiration",
+    "pattern": "(?i)(?:jwt\\.sign\\(|jwt\\.create\\(|token\\.add).*\\)",
+    "severity": "MEDIUM",
+    "category": "A01",
+    "description": "JWT without expiration",
+    "remediation": "Always set appropriate token expiration."
+  },
+  {
+    "name": "Open Redirect",
+    "pattern": "(?i)(sendRedirect|res\\.redirect)\\(",
+    "severity": "MEDIUM",
+    "category": "A01",
+    "description": "Redirect without validation",
+    "remediation": "Whitelist redirect URLs."
+  },
+  {
+    "name": "Rails Mass Assignment",
+    "pattern": "(?i)params\\.permit\\(",
+    "severity": "MEDIUM",
+    "category": "A01",
+    "description": "Potential mass assignment",
+    "remediation": "Whitelist permitted fields explicitly."
+  },
+  {
+    "name": "Go crypto/md5",
+    "pattern": "(?i)md5\\.New\\(",
+    "severity": "MEDIUM",
+    "category": "A02",
+    "description": "crypto/md5",
+    "remediation": "Use crypto/sha256."
+  },
+  {
+    "name": "MD5",
+    "pattern": "(?i)md5\\s*\\(",
+    "severity": "MEDIUM",
+    "category": "A02",
+    "description": "Weak MD5 hash",
+    "remediation": "Use SHA-256 or better."
+  },
+  {
+    "name": "Python hashlib md5",
+    "pattern": "(?i)hashlib\\.md5\\(",
+    "severity": "MEDIUM",
+    "category": "A02",
+    "description": "hashlib.md5",
+    "remediation": "Use hashlib.sha256."
+  },
+  {
+    "name": "SHA1",
+    "pattern": "(?i)sha1\\s*\\(",
+    "severity": "MEDIUM",
+    "category": "A02",
+    "description": "Weak SHA1 hash",
+    "remediation": "Use SHA-256 or better."
+  },
+  {
+    "name": "Weak PBKDF2 Iteration Count",
+    "pattern": "(?i)pbkdf2.*(?:iterations|count)\\s*[<=]\\s*10000",
+    "severity": "MEDIUM",
+    "category": "A02",
+    "description": "Low PBKDF2 iteration count",
+    "remediation": "Use ≥100k iterations for PBKDF2."
+  },
+  {
+    "name": "Weak Random Generation",
+    "pattern": "(?i)(?:Math\\.random\\(\\)|rand\\.Intn\\(|random\\.random\\(\\))",
+    "severity": "MEDIUM",
+    "category": "A02",
+    "description": "Non-cryptographic random generator",
+    "remediation": "Use secure random functions."
+  },
+  {
+    "name": "No Rate Limiting on Auth",
+    "pattern": "(?i)(POST|GET)\\s*/\\S*(login|auth|signin)\\b",
+    "severity": "MEDIUM",
+    "category": "A04",
+    "description": "Auth endpoint lacks rate limiting",
+    "remediation": "Apply rate limiting/throttling to auth endpoints."
+  },
+  {
+    "name": "Schema Validation Disabled",
+    "pattern": "(?i)validateSchema\\s*[:=]\\s*false",
+    "severity": "MEDIUM",
+    "category": "A04",
+    "description": "Schema validation turned off",
+    "remediation": "Enable input schema validation."
+  },
+  {
+    "name": "Django Debug Mode Enabled",
+    "pattern": "(?i)DEBUG\\s*=\\s*True",
+    "severity": "MEDIUM",
+    "category": "A05",
+    "description": "Django is running with DEBUG = True, which can expose sensitive configuration.",
+    "remediation": "Ensure DEBUG is set to False in all production settings files."
+  },
+  {
+    "name": "Flask Debug",
+    "pattern": "(?i)app\\.run\\(.*debug\\s*=\\s*True",
+    "severity": "MEDIUM",
+    "category": "A05",
+    "description": "Debug mode on",
+    "remediation": "Disable debug in prod."
+  },
+  {
+    "name": "Hardcoded IP Address",
+    "pattern": "(?i)\\b((?:25[0-5]|2[0-4]\\d|[01]?\\d?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|[01]?\\d?\\d)){3})\\b",
+    "severity": "MEDIUM",
+    "category": "A05",
+    "description": "Hardcoded IPv4 address",
+    "remediation": "Use DNS names or config management for IPs."
+  },
+  {
+    "name": "Java Debug Enabled",
+    "pattern": "(?i)spring\\.boot\\.devtools\\.restart\\.enabled\\s*=\\s*true",
+    "severity": "MEDIUM",
+    "category": "A05",
+    "description": "Devtools in prod",
+    "remediation": "Disable devtools in prod."
+  },
+  {
+    "name": "Missing CSP Header",
+    "pattern": "(?i)Content-Security-Policy:\\s*",
+    "severity": "MEDIUM",
+    "category": "A05",
+    "description": "CSP header missing",
+    "remediation": "Define a strict CSP to lock down scripts/styles."
+  },
+  {
+    "name": "Missing HSTS Header",
+    "pattern": "(?i)Strict-Transport-Security:\\s*max-age=\\d+",
+    "severity": "MEDIUM",
+    "category": "A05",
+    "description": "HSTS header missing",
+    "remediation": "Add `Strict-Transport-Security: max-age=63072000; includeSubDomains`."
+  },
+  {
+    "name": "Missing HttpOnly/Secure Cookie",
+    "pattern": "(?i)Set-Cookie:",
+    "severity": "MEDIUM",
+    "category": "A05",
+    "description": "Insecure cookie flags",
+    "remediation": "Set HttpOnly and Secure flags on cookies."
+  },
+  {
+    "name": "Missing X-Content-Type-Options",
+    "pattern": "(?i)X-Content-Type-Options:\\s*nosniff",
+    "severity": "MEDIUM",
+    "category": "A05",
+    "description": "X-Content-Type-Options header missing",
+    "remediation": "Add `X-Content-Type-Options: nosniff`."
+  },
+  {
+    "name": "Missing X-Frame-Options",
+    "pattern": "(?i)X-Frame-Options:\\s*(DENY|SAMEORIGIN)",
+    "severity": "MEDIUM",
+    "category": "A05",
+    "description": "X-Frame-Options header missing",
+    "remediation": "Add `X-Frame-Options: DENY` or `SAMEORIGIN`."
+  },
+  {
+    "name": "Node.js Express Error Handler",
+    "pattern": "(?i)app\\.use\\(errorHandler\\)",
+    "severity": "MEDIUM",
+    "category": "A05",
+    "description": "Default error handler",
+    "remediation": "Use custom error handler."
+  },
+  {
+    "name": "Open CORS Policy",
+    "pattern": "(?i)Access-Control-Allow-Origin:\\s*\\*",
+    "severity": "MEDIUM",
+    "category": "A05",
+    "description": "CORS policy allows any origin",
+    "remediation": "Restrict CORS to trusted domains."
+  },
+  {
+    "name": "Inline JS Handler",
+    "pattern": "(?i)on\\w+\\s*=\\s*[\"'].*[\"']",
+    "severity": "MEDIUM",
+    "category": "A07",
+    "description": "Inline JS event",
+    "remediation": "Use addEventListener()."
+  },
+  {
+    "name": "document.write",
+    "pattern": "(?i)document\\.write\\s*\\(",
+    "severity": "MEDIUM",
+    "category": "A07",
+    "description": "document.write used",
+    "remediation": "Avoid document.write()."
+  },
+  {
+    "name": "Go json.Unmarshal unchecked",
+    "pattern": "(?i)json\\.Unmarshal\\(",
+    "severity": "MEDIUM",
+    "category": "A08",
+    "description": "json.Unmarshal",
+    "remediation": "Validate JSON before unmarshal."
+  },
+  {
+    "name": "Exceptions Caught Without Logging",
+    "pattern": "(?i)catch\\s*\\([^)]*\\)\\s*\\{",
+    "severity": "MEDIUM",
+    "category": "A09",
+    "description": "Exception handler lacks logging",
+    "remediation": "Log caught exceptions (e.g. `console.error(err)`)."
+  },
+  {
+    "name": "Generic Exception Catch",
+    "pattern": "catch\\s*\\(\\s*Exception\\s+e\\s*\\)",
+    "severity": "MEDIUM",
+    "category": "A09",
+    "description": "Catching a generic Exception can hide specific, security-relevant errors.",
+    "remediation": "Catch specific exception types to ensure proper error handling and logging."
   }
 ]
