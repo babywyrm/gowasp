@@ -6,6 +6,7 @@
 *.dylib
 *.test
 *.out
+scanner
 
 # Output binaries
 /bin/

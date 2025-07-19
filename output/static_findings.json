@@ -1,0 +1,290 @@
+[
+  {
+    "file": "dvja/src/main/java/com/appsecco/dvja/controllers/PingAction.java",
+    "line": 46,
+    "rule_name": "Command Exec",
+    "match": "exec(",
+    "severity": "CRITICAL",
+    "category": "A03",
+    "timestamp": "2025-07-19T12:22:05.413787-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 2,
+    "rule_name": "Command Exec",
+    "match": "exec(",
+    "severity": "CRITICAL",
+    "category": "A03",
+    "timestamp": "2025-07-19T12:22:05.532889-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 3,
+    "rule_name": "Command Exec",
+    "match": "exec(",
+    "severity": "CRITICAL",
+    "category": "A03",
+    "timestamp": "2025-07-19T12:22:05.629436-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 4,
+    "rule_name": "JS eval with template literals",
+    "match": "Eval(",
+    "severity": "CRITICAL",
+    "category": "A03",
+    "timestamp": "2025-07-19T12:22:05.721328-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 4,
+    "rule_name": "Command Exec",
+    "match": "exec(",
+    "severity": "CRITICAL",
+    "category": "A03",
+    "timestamp": "2025-07-19T12:22:05.720201-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/showdown.min.js",
+    "line": 3,
+    "rule_name": "Command Exec",
+    "match": "exec(",
+    "severity": "CRITICAL",
+    "category": "A03",
+    "timestamp": "2025-07-19T12:22:05.797797-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 2,
+    "rule_name": "CRLF Injection",
+    "match": "\\r\\n",
+    "severity": "HIGH",
+    "category": "A03",
+    "timestamp": "2025-07-19T12:22:05.565877-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 3,
+    "rule_name": "CRLF Injection",
+    "match": "\\r\\n",
+    "severity": "HIGH",
+    "category": "A03",
+    "timestamp": "2025-07-19T12:22:05.66243-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 4,
+    "rule_name": "CRLF Injection",
+    "match": "\\r\\n",
+    "severity": "HIGH",
+    "category": "A03",
+    "timestamp": "2025-07-19T12:22:05.743359-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/showdown.min.js",
+    "line": 3,
+    "rule_name": "CRLF Injection",
+    "match": "\\r\\n",
+    "severity": "HIGH",
+    "category": "A03",
+    "timestamp": "2025-07-19T12:22:05.829847-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 2,
+    "rule_name": "innerHTML",
+    "match": ".innerHTML=",
+    "severity": "HIGH",
+    "category": "A07",
+    "timestamp": "2025-07-19T12:22:05.534881-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 3,
+    "rule_name": "innerHTML",
+    "match": ".innerHTML=",
+    "severity": "HIGH",
+    "category": "A07",
+    "timestamp": "2025-07-19T12:22:05.631441-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 4,
+    "rule_name": "innerHTML",
+    "match": ".innerHTML=",
+    "severity": "HIGH",
+    "category": "A07",
+    "timestamp": "2025-07-19T12:22:05.721919-07:00"
+  },
+  {
+    "file": "dvja/src/main/java/com/appsecco/dvja/services/UserService.java",
+    "line": 93,
+    "rule_name": "Sensitive Data in Logs",
+    "match": "logger.info(\"Changing password",
+    "severity": "HIGH",
+    "category": "A09",
+    "timestamp": "2025-07-19T12:22:05.489862-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 2,
+    "rule_name": "Silent Catch",
+    "match": "catch(x){}",
+    "severity": "HIGH",
+    "category": "A09",
+    "timestamp": "2025-07-19T12:22:05.603828-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 3,
+    "rule_name": "Silent Catch",
+    "match": "catch(e){}",
+    "severity": "HIGH",
+    "category": "A09",
+    "timestamp": "2025-07-19T12:22:05.701114-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 4,
+    "rule_name": "Silent Catch",
+    "match": "catch(b){}",
+    "severity": "HIGH",
+    "category": "A09",
+    "timestamp": "2025-07-19T12:22:05.770911-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 2,
+    "rule_name": "Weak Random Generation",
+    "match": "Math.random()",
+    "severity": "MEDIUM",
+    "category": "A02",
+    "timestamp": "2025-07-19T12:22:05.57352-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/showdown.min.js",
+    "line": 3,
+    "rule_name": "Weak Random Generation",
+    "match": "Math.random()",
+    "severity": "MEDIUM",
+    "category": "A02",
+    "timestamp": "2025-07-19T12:22:05.837789-07:00"
+  },
+  {
+    "file": "dvja/src/main/java/com/appsecco/dvja/Constant.java",
+    "line": 4,
+    "rule_name": "Inline JS Handler",
+    "match": "ON_USER_HANDLE = \"USER\"",
+    "severity": "MEDIUM",
+    "category": "A07",
+    "timestamp": "2025-07-19T12:22:05.383884-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 3,
+    "rule_name": "Inline JS Handler",
+    "match": "ontent=\"\"}else m.push(b.createTextNode(f));l.textContent=\"\",n=0;while(f=m[n++])i...",
+    "severity": "MEDIUM",
+    "category": "A07",
+    "timestamp": "2025-07-19T12:22:05.680696-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/index.html",
+    "line": 4,
+    "rule_name": "Inline JS Handler",
+    "match": "ONTENT=\"0;URL=Login.action\"",
+    "severity": "MEDIUM",
+    "category": "A07",
+    "timestamp": "2025-07-19T12:22:05.886559-07:00"
+  },
+  {
+    "file": "dvja/src/main/java/com/appsecco/dvja/controllers/BaseController.java",
+    "line": 61,
+    "rule_name": "Exceptions Caught Without Logging",
+    "match": "catch (IOException e) {",
+    "severity": "MEDIUM",
+    "category": "A09",
+    "timestamp": "2025-07-19T12:22:05.400196-07:00"
+  },
+  {
+    "file": "dvja/src/main/java/com/appsecco/dvja/controllers/BaseController.java",
+    "line": 74,
+    "rule_name": "Exceptions Caught Without Logging",
+    "match": "catch (IOException e) {",
+    "severity": "MEDIUM",
+    "category": "A09",
+    "timestamp": "2025-07-19T12:22:05.401488-07:00"
+  },
+  {
+    "file": "dvja/src/main/java/com/appsecco/dvja/controllers/PingAction.java",
+    "line": 36,
+    "rule_name": "Exceptions Caught Without Logging",
+    "match": "catch (Exception e) {",
+    "severity": "MEDIUM",
+    "category": "A09",
+    "timestamp": "2025-07-19T12:22:05.412739-07:00"
+  },
+  {
+    "file": "dvja/src/main/java/com/appsecco/dvja/controllers/ProductAction.java",
+    "line": 89,
+    "rule_name": "Exceptions Caught Without Logging",
+    "match": "catch(Exception e) {",
+    "severity": "MEDIUM",
+    "category": "A09",
+    "timestamp": "2025-07-19T12:22:05.423948-07:00"
+  },
+  {
+    "file": "dvja/src/main/java/com/appsecco/dvja/controllers/Register.java",
+    "line": 88,
+    "rule_name": "Exceptions Caught Without Logging",
+    "match": "catch(Exception e) {",
+    "severity": "MEDIUM",
+    "category": "A09",
+    "timestamp": "2025-07-19T12:22:05.434602-07:00"
+  },
+  {
+    "file": "dvja/src/main/java/com/appsecco/dvja/controllers/ResetPassword.java",
+    "line": 77,
+    "rule_name": "Exceptions Caught Without Logging",
+    "match": "catch(Exception e) {",
+    "severity": "MEDIUM",
+    "category": "A09",
+    "timestamp": "2025-07-19T12:22:05.441815-07:00"
+  },
+  {
+    "file": "dvja/src/main/java/com/appsecco/dvja/controllers/UserAction.java",
+    "line": 115,
+    "rule_name": "Exceptions Caught Without Logging",
+    "match": "catch(Exception e) {",
+    "severity": "MEDIUM",
+    "category": "A09",
+    "timestamp": "2025-07-19T12:22:05.452536-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 2,
+    "rule_name": "Exceptions Caught Without Logging",
+    "match": "catch(fa){",
+    "severity": "MEDIUM",
+    "category": "A09",
+    "timestamp": "2025-07-19T12:22:05.582946-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 3,
+    "rule_name": "Exceptions Caught Without Logging",
+    "match": "catch(e){",
+    "severity": "MEDIUM",
+    "category": "A09",
+    "timestamp": "2025-07-19T12:22:05.680787-07:00"
+  },
+  {
+    "file": "dvja/src/main/webapp/assets/jquery-3.2.1.min.js",
+    "line": 4,
+    "rule_name": "Exceptions Caught Without Logging",
+    "match": "catch(d){",
+    "severity": "MEDIUM",
+    "category": "A09",
+    "timestamp": "2025-07-19T12:22:05.756031-07:00"
+  }
+]
