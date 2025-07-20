@@ -1,4 +1,4 @@
-#!/usr/-bin/env python3
+#!/usr/bin/env python3
 import os
 import sys
 import json
@@ -219,7 +219,7 @@ class Orchestrator:
         return all_ai_findings
 
     def run_threat_model(self) -> None:
-        """Performs a repo-level threat model using the attacker profile."""
+        """Performs a repo-level threat model with a robust retry mechanism."""
         print("\n+) Running Expert Mode: Attacker Perspective Threat Model...")
         files = self._get_files_to_scan()
         
@@ -234,22 +234,38 @@ class Orchestrator:
 
         prompt = self.prompt_templates['attacker'].format(code=full_context)
         
-        try:
-            client = anthropic.Anthropic(api_key=self.api_key)
-            resp = client.messages.create(model=CLAUDE_MODEL, max_tokens=4000, messages=[{"role": "user", "content": prompt}])
-            text = resp.content[0].text.strip()
-            start = text.find('{')
-            end = text.rfind('}') + 1
-            if start >= 0 and end > start:
-                report = json.loads(text[start:end])
-                report_file = self.output_path / "threat_model_report.json"
-                with open(report_file, "w") as f:
-                    json.dump(report, f, indent=2)
-                print(f"   → Threat model report written to {report_file}")
-            else:
-                print("   ERROR: Claude did not return a valid JSON object for the threat model.", file=sys.stderr)
-        except Exception as e:
-            print(f"   ERROR: Failed to generate threat model: {e}", file=sys.stderr)
+        # **THE FIX IS HERE: Add the same retry logic to this heavy-duty API call.**
+        for attempt in range(MAX_RETRIES):
+            try:
+                client = anthropic.Anthropic(api_key=self.api_key)
+                resp = client.messages.create(model=CLAUDE_MODEL, max_tokens=4000, messages=[{"role": "user", "content": prompt}])
+                text = resp.content[0].text.strip()
+                start = text.find('{')
+                end = text.rfind('}') + 1
+                if start >= 0 and end > start:
+                    report = json.loads(text[start:end])
+                    report_file = self.output_path / "threat_model_report.json"
+                    with open(report_file, "w") as f:
+                        json.dump(report, f, indent=2)
+                    print(f"   → Threat model report written to {report_file}")
+                    return # Success, exit the function
+                else:
+                    print("   ERROR: Claude did not return a valid JSON object for the threat model.", file=sys.stderr)
+                    return # No point in retrying if the format is wrong
+            except anthropic.APIStatusError as e:
+                if e.status_code == 529 and attempt < MAX_RETRIES - 1:
+                    # Use a longer, fixed wait time for this very large request.
+                    wait_time = 20
+                    print(f"WARNING: Claude API overloaded for threat model. Retrying in {wait_time} seconds...", file=sys.stderr)
+                    time.sleep(wait_time)
+                else:
+                    print(f"   ERROR: Failed to generate threat model after {attempt + 1} attempts: {e}", file=sys.stderr)
+                    return
+            except Exception as e:
+                print(f"   ERROR: Failed to generate threat model: {e}", file=sys.stderr)
+                return
+        print("   ERROR: All retries failed for threat model generation.", file=sys.stderr)
+
 
     def run(self) -> None:
         """Executes the full scan and merge workflow."""
@@ -290,31 +306,20 @@ def main() -> None:
         formatter_class=argparse.RawTextHelpFormatter
     )
     
-    # --- Positional Arguments ---
     parser.add_argument("repo_path", type=Path, help="Path to the repository to scan.")
     parser.add_argument("scanner_bin", type=Path, help="Path to the gowasp scanner binary.")
     
-    # --- Core Scan Configuration ---
     parser.add_argument("--profile", type=str.lower, default="owasp", help="Comma-separated list of AI analysis profiles (e.g., 'owasp,performance').")
     parser.add_argument("--static-rules", type=str, help="Comma-separated paths to static rule files for the Go scanner.")
     parser.add_argument("--severity", type=str.upper, choices=["CRITICAL", "HIGH", "MEDIUM", "LOW"], help="Minimum severity to report.")
     
-    # --- Expert/Advanced Modes ---
     parser.add_argument("--threat-model", action="store_true", help="Perform a repo-level, attacker-perspective threat model.")
     
-    # --- Execution & Output Control ---
     parser.add_argument("--parallel", action="store_true", help="Run Claude analysis in parallel.")
     parser.add_argument("--verbose", action="store_true", help="Show live Claude results and gowasp remediation advice.")
     parser.add_argument("--debug", action="store_true", help="Enable verbose debug output for troubleshooting.")
     
     args = parser.parse_args()
-
-    if not args.repo_path.is_dir():
-        print(f"Error: '{args.repo_path}' is not a directory", file=sys.stderr)
-        sys.exit(1)
-    if not args.scanner_bin.is_file() or not os.access(args.scanner_bin, os.X_OK):
-        print(f"Error: scanner binary '{args.scanner_bin}' not found or not executable", file=sys.stderr)
-        sys.exit(1)
 
     orchestrator = Orchestrator(
         repo_path=args.repo_path,
