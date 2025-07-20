@@ -22,6 +22,9 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 )
 
+// --- Core Data Structures ---
+
+// Rule defines a single static analysis rule.
 type Rule struct {
 	Name        string
 	Regex       string
@@ -32,6 +35,7 @@ type Rule struct {
 	Remediation string
 }
 
+// Finding represents a single vulnerability discovered in a file.
 type Finding struct {
 	File      string    `json:"file"`
 	Line      int       `json:"line"`
@@ -42,6 +46,8 @@ type Finding struct {
 	Timestamp time.Time `json:"timestamp"`
 }
 
+// --- Global Variables and Constants ---
+
 var rules []Rule
 var ruleMap = map[string]Rule{}
 
@@ -49,6 +55,7 @@ var supportedExtensions = map[string]bool{
 	".go": true, ".js": true, ".py": true, ".java": true, ".html": true, ".php": true,
 }
 
+// severityLevels provides a numeric weight for sorting and filtering.
 var severityLevels = map[string]int{
 	"CRITICAL": 4,
 	"HIGH":     3,
@@ -56,6 +63,9 @@ var severityLevels = map[string]int{
 	"LOW":      1,
 }
 
+// --- Rule Loading and Management ---
+
+// InitRules defines the default, built-in security rules as a fallback.
 func InitRules() []Rule {
 	return []Rule{
 		{
@@ -70,6 +80,7 @@ func InitRules() []Rule {
 	}
 }
 
+// loadRulesFromFile parses a JSON file into a slice of Rule structs.
 func loadRulesFromFile(path string) ([]Rule, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -108,6 +119,7 @@ func loadRulesFromFile(path string) ([]Rule, error) {
 	return out, nil
 }
 
+// init populates the global ruleMap with the initial set of built-in rules.
 func init() {
 	ruleMap = make(map[string]Rule)
 	rules = InitRules()
@@ -116,6 +128,9 @@ func init() {
 	}
 }
 
+// --- Filtering and Utility Functions ---
+
+// meetsSeverityThreshold checks if a finding's severity is at or above the minimum threshold.
 func meetsSeverityThreshold(findingSeverity, minSeverity string) bool {
 	if minSeverity == "" {
 		return true
@@ -131,6 +146,7 @@ func meetsSeverityThreshold(findingSeverity, minSeverity string) bool {
 	return fLvl >= mLvl
 }
 
+// filterBySeverity returns a new slice of findings that meet the minimum severity.
 func filterBySeverity(findings []Finding, minSeverity string) []Finding {
 	if minSeverity == "" {
 		return findings
@@ -144,12 +160,14 @@ func filterBySeverity(findings []Finding, minSeverity string) []Finding {
 	return out
 }
 
+// runCommand executes an external command and returns its combined output.
 func runCommand(ctx context.Context, cmd string, args ...string) (string, error) {
 	c := exec.CommandContext(ctx, cmd, args...)
 	out, err := c.CombinedOutput()
 	return string(out), err
 }
 
+// getGitChangedFiles returns a list of files changed in the last git commit.
 func getGitChangedFiles(ctx context.Context) ([]string, error) {
 	out, err := runCommand(ctx, "git", "diff", "--name-only", "HEAD~1")
 	if err != nil {
@@ -158,6 +176,7 @@ func getGitChangedFiles(ctx context.Context) ([]string, error) {
 	return strings.Split(strings.TrimSpace(out), "\n"), nil
 }
 
+// loadIgnorePatterns reads ignore patterns from a flag and the .scannerignore file.
 func loadIgnorePatterns(ignoreFlag string) ([]string, error) {
 	var pats []string
 	if ignoreFlag != "" {
@@ -181,6 +200,7 @@ func loadIgnorePatterns(ignoreFlag string) ([]string, error) {
 	return pats, sc.Err()
 }
 
+// shouldIgnore checks if a given file path matches any of the ignore patterns.
 func shouldIgnore(path string, patterns []string) bool {
 	for _, pat := range patterns {
 		if ok, _ := doublestar.PathMatch(pat, path); ok {
@@ -190,6 +210,9 @@ func shouldIgnore(path string, patterns []string) bool {
 	return false
 }
 
+// --- Core Scanning Logic ---
+
+// scanFile reads a single file line-by-line and applies all loaded rules.
 func scanFile(path string, debug bool) ([]Finding, error) {
 	if debug {
 		log.Printf("Scanning file: %s", path)
@@ -240,6 +263,7 @@ func scanFile(path string, debug bool) ([]Finding, error) {
 	return out, nil
 }
 
+// scanDir walks a directory to find files to scan, or gets them from git diff.
 func scanDir(ctx context.Context, root string, useGit, debug bool, ignorePatterns []string) ([]Finding, error) {
 	if debug {
 		log.Printf("Starting scan in %s git=%v", root, useGit)
@@ -275,14 +299,16 @@ func scanDir(ctx context.Context, root string, useGit, debug bool, ignorePattern
 	return all, nil
 }
 
-// *** THE FIX IS HERE ***
+// --- Output and Reporting ---
+
+// summarize prints a human-readable summary of findings to standard output.
 func summarize(findings []Finding) {
 	sev, cat := map[string]int{}, map[string]int{}
 	for _, f := range findings {
 		sev[f.Severity]++
 		cat[f.Category]++
 	}
-	// Using "---" instead of "[]" to avoid confusing the JSON parser
+	// Using "---" instead of "[]" to avoid confusing the JSON parser in the orchestrator.
 	fmt.Println("\n--- Severity Summary ---")
 	for k, v := range sev {
 		fmt.Printf("  %s: %d\n", k, v)
@@ -293,6 +319,7 @@ func summarize(findings []Finding) {
 	}
 }
 
+// outputMarkdownBody generates a GitHub-flavored Markdown report.
 func outputMarkdownBody(findings []Finding, verbose bool) string {
 	var b strings.Builder
 	b.WriteString("### 🔍 Static Analysis Findings\n\n")
@@ -328,6 +355,7 @@ func outputMarkdownBody(findings []Finding, verbose bool) string {
 	return b.String()
 }
 
+// postGitHubComment posts a comment to a GitHub Pull Request.
 func postGitHubComment(body string) error {
 	repo := os.Getenv("GITHUB_REPOSITORY")
 	pr := os.Getenv("GITHUB_PR_NUMBER")
@@ -353,7 +381,10 @@ func postGitHubComment(body string) error {
 	return nil
 }
 
+// --- Main Execution Flow ---
+
 func main() {
+	// 1. Parse command-line flags.
 	dir := flag.String("dir", ".", "Directory to scan")
 	output := flag.String("output", "text", "Output: text/json/markdown")
 	debug := flag.Bool("debug", false, "Debug mode")
@@ -372,6 +403,7 @@ func main() {
 		}
 	}
 
+	// 2. Load rules from specified files, or fall back to defaults.
 	if *ruleFiles != "" {
 		rules = nil
 		ruleMap = make(map[string]Rule)
@@ -413,17 +445,21 @@ func main() {
 			log.Printf("Filtering for severity >= %s", *minSeverity)
 		}
 	}
+
+	// 3. Load ignore patterns.
 	ignorePatterns, err := loadIgnorePatterns(*ignoreFlag)
 	if err != nil {
 		log.Fatalf("Failed loading ignore patterns: %v", err)
 	}
 
+	// 4. Execute the scan.
 	allFindings, err := scanDir(context.Background(), *dir, *useGit, *debug, ignorePatterns)
 	if err != nil {
 		log.Fatalf("Scan error: %v", err)
 	}
 	findings := filterBySeverity(allFindings, *minSeverity)
 
+	// 5. Sort findings for consistent output.
 	sort.Slice(findings, func(i, j int) bool {
 		si := severityLevels[findings[i].Severity]
 		sj := severityLevels[findings[j].Severity]
@@ -439,6 +475,7 @@ func main() {
 		return findings[i].Line < findings[j].Line
 	})
 
+	// 6. Handle human-readable summaries for non-JSON output.
 	if *output != "json" {
 		if len(findings) == 0 {
 			if *minSeverity != "" && len(allFindings) > 0 {
@@ -457,6 +494,7 @@ func main() {
 		summarize(findings)
 	}
 
+	// 7. Print the final report based on the selected output format.
 	switch *output {
 	case "text":
 		for _, f := range findings {
@@ -481,6 +519,7 @@ func main() {
 		log.Fatalf("Unsupported output: %s", *output)
 	}
 
+	// 8. Exit with an error code if critical findings are found (for CI/CD).
 	if *exitHigh {
 		for _, f := range findings {
 			if f.Severity == "HIGH" {
