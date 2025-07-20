@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/-bin/env python3
 import os
 import sys
 import json
@@ -28,13 +28,14 @@ class Orchestrator:
     """
     Orchestrates security scans using a static Go scanner and the Claude AI.
     """
-    def __init__(self, repo_path: Path, scanner_bin: Path, parallel: bool, debug: bool, severity: Optional[str], profiles: str, threat_model: bool, verbose: bool):
+    def __init__(self, repo_path: Path, scanner_bin: Path, parallel: bool, debug: bool, severity: Optional[str], profiles: str, static_rules: Optional[str], threat_model: bool, verbose: bool):
         self.repo_path = repo_path.resolve()
         self.scanner_bin = scanner_bin.resolve()
         self.parallel = parallel
         self.debug = debug
         self.severity = severity.upper() if severity else None
         self.profiles = [p.strip() for p in profiles.split(',')]
+        self.static_rules = static_rules
         self.threat_model = threat_model
         self.verbose = verbose
         
@@ -56,7 +57,7 @@ class Orchestrator:
     def _load_prompt_templates(self) -> Dict[str, str]:
         """Loads all requested prompt templates from the prompts/ directory."""
         templates = {}
-        profiles_to_load = self.profiles[:] # Create a copy
+        profiles_to_load = self.profiles[:]
         if self.threat_model and 'attacker' not in profiles_to_load:
             profiles_to_load.append('attacker')
 
@@ -78,10 +79,12 @@ class Orchestrator:
         return finding_level >= threshold_level
 
     def run_static_scanner(self) -> List[Finding]:
-        """Runs the gowasp scanner, passing through severity and verbose flags."""
+        """Runs the gowasp scanner and extracts the JSON array from its output."""
         cmd = [str(self.scanner_bin), "--dir", str(self.repo_path), "--output", "json"]
         if self.severity:
             cmd.extend(["--severity", self.severity])
+        if self.static_rules:
+            cmd.extend(["--rules", self.static_rules])
         if self.verbose:
             cmd.append("--verbose")
             
@@ -100,7 +103,7 @@ class Orchestrator:
             return []
 
     def _get_files_to_scan(self) -> List[Path]:
-        """Lists all source files for AI analysis."""
+        """Lists all source files for AI analysis, skipping common dependency directories."""
         skip_dirs = {'.git', 'node_modules', '__pycache__', 'vendor', 'build', 'dist'}
         files = []
         for p in self.repo_path.rglob('*'):
@@ -146,15 +149,10 @@ class Orchestrator:
         print(f"\n--- Claude Live Analysis: {file_path} (Profile: {profile}) ---", file=sys.stderr)
         risk = result.get("overall_risk", "N/A")
         
-        findings_key = ""
-        for key in result:
-            if key.endswith("_findings"):
-                findings_key = key
-                break
-        
+        findings_key = next((key for key in result if key.endswith("_findings")), None)
         findings = result.get(findings_key, [])
-        print(f"  Overall Risk: {risk} | Findings: {len(findings)}", file=sys.stderr)
         
+        print(f"  Overall Risk: {risk} | Findings: {len(findings)}", file=sys.stderr)
         for f in findings:
             sev = f.get('severity', 'UNK')
             title = f.get('title', 'Unknown Issue')
@@ -183,13 +181,9 @@ class Orchestrator:
                 if self.debug or self.verbose:
                     self._print_live_claude_summary(fpath, full_result, profile)
 
-                findings_key = ""
-                for key in full_result:
-                    if key.endswith("_findings"):
-                        findings_key = key
-                        break
-                
+                findings_key = next((key for key in full_result if key.endswith("_findings")), None)
                 original_findings = full_result.get(findings_key, [])
+                
                 processed = []
                 for item in original_findings:
                     if self._meets_severity_threshold(item.get("severity", "")):
@@ -229,17 +223,16 @@ class Orchestrator:
         print("\n+) Running Expert Mode: Attacker Perspective Threat Model...")
         files = self._get_files_to_scan()
         
-        full_context = []
-        for fpath in files:
-            full_context.append(f"--- FILE: {fpath} ---\n")
-            full_context.append(fpath.read_text(encoding='utf-8', errors='replace'))
-            full_context.append("\n\n")
+        full_context = "".join(
+            f"--- FILE: {fpath} ---\n{fpath.read_text(encoding='utf-8', errors='replace')}\n\n"
+            for fpath in files
+        )
         
         if not full_context:
             print("   No files found to analyze for threat model.")
             return
 
-        prompt = self.prompt_templates['attacker'].format(code="".join(full_context))
+        prompt = self.prompt_templates['attacker'].format(code=full_context)
         
         try:
             client = anthropic.Anthropic(api_key=self.api_key)
@@ -261,8 +254,6 @@ class Orchestrator:
     def run(self) -> None:
         """Executes the full scan and merge workflow."""
         static_findings = self.run_static_scanner()
-        for finding in static_findings:
-            finding['source'] = 'gowasp'
         static_output_file = self.output_path / "static_findings.json"
         with open(static_output_file, "w") as f:
             json.dump(static_findings, f, indent=2)
@@ -294,34 +285,36 @@ class Orchestrator:
 
 def main() -> None:
     """Parses command-line arguments and runs the orchestrator."""
-    parser = argparse.ArgumentParser(description="Orchestrator for gowasp and Claude scanners.")
+    parser = argparse.ArgumentParser(
+        description="Orchestrator for gowasp and Claude scanners.",
+        formatter_class=argparse.RawTextHelpFormatter
+    )
+    
+    # --- Positional Arguments ---
     parser.add_argument("repo_path", type=Path, help="Path to the repository to scan.")
     parser.add_argument("scanner_bin", type=Path, help="Path to the gowasp scanner binary.")
+    
+    # --- Core Scan Configuration ---
+    parser.add_argument("--profile", type=str.lower, default="owasp", help="Comma-separated list of AI analysis profiles (e.g., 'owasp,performance').")
+    parser.add_argument("--static-rules", type=str, help="Comma-separated paths to static rule files for the Go scanner.")
+    parser.add_argument("--severity", type=str.upper, choices=["CRITICAL", "HIGH", "MEDIUM", "LOW"], help="Minimum severity to report.")
+    
+    # --- Expert/Advanced Modes ---
+    parser.add_argument("--threat-model", action="store_true", help="Perform a repo-level, attacker-perspective threat model.")
+    
+    # --- Execution & Output Control ---
     parser.add_argument("--parallel", action="store_true", help="Run Claude analysis in parallel.")
-    parser.add_argument("--debug", action="store_true", help="Enable debug mode for verbose output.")
-    parser.add_argument(
-        "--severity",
-        type=str.upper,
-        choices=["CRITICAL", "HIGH", "MEDIUM", "LOW"],
-        help="Minimum severity to report."
-    )
-    parser.add_argument(
-        "--profile",
-        type=str.lower,
-        default="owasp",
-        help="Comma-separated list of file-by-file analysis profiles (e.g., 'owasp,performance')."
-    )
-    parser.add_argument(
-        "--threat-model",
-        action="store_true",
-        help="Perform a repo-level, attacker-perspective threat model."
-    )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Show remediation advice from the static scanner and live Claude results."
-    )
+    parser.add_argument("--verbose", action="store_true", help="Show live Claude results and gowasp remediation advice.")
+    parser.add_argument("--debug", action="store_true", help="Enable verbose debug output for troubleshooting.")
+    
     args = parser.parse_args()
+
+    if not args.repo_path.is_dir():
+        print(f"Error: '{args.repo_path}' is not a directory", file=sys.stderr)
+        sys.exit(1)
+    if not args.scanner_bin.is_file() or not os.access(args.scanner_bin, os.X_OK):
+        print(f"Error: scanner binary '{args.scanner_bin}' not found or not executable", file=sys.stderr)
+        sys.exit(1)
 
     orchestrator = Orchestrator(
         repo_path=args.repo_path,
@@ -330,6 +323,7 @@ def main() -> None:
         debug=args.debug,
         severity=args.severity,
         profiles=args.profile,
+        static_rules=args.static_rules,
         threat_model=args.threat_model,
         verbose=args.verbose
     )
