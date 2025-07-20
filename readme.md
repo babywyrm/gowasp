@@ -1,14 +1,20 @@
 # GOWASP Hybrid Security Scanner 🎉  ( Beta )
 
 Do you hate reviews.
+
 Do you love CTFs.
+
 Do you hate java contorllers.
+
 Do you love having more time to not look at screens.
+
 Do you miss the 90s.
 
 # Read On 
 
-GOWASP is a lightweight, multi-language static analysis tool that detects OWASP Top 10 security issues—and more—in your source code. It operates in two modes:
+GOWASP is a lightweight, multi-language static analysis tool that detects OWASP Top 10 security issues—and more—in your source code. 
+
+It operates in two modes:
 
 1.  **Standalone Go Scanner:** A fast, regex-based scanner perfect for quick checks and CI/CD integration.
 2.  **Python Orchestrator:** A powerful wrapper that combines the Go scanner's speed with the deep contextual analysis of **Claude AI**, providing a comprehensive, multi-layered security report.
