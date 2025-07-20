@@ -183,6 +183,3 @@ output/
 4.  **Reduce Noise:** Use `--ignore` or a `.scannerignore` file to exclude test files, dependencies, and generated code.
 5.  **Trace Findings:** In the `combined_findings.json` file, use the `"source"` field to see whether a vulnerability was found by `"gowasp"` or `"claude"`.
 
-
-##
-##
