@@ -1,10 +1,10 @@
-# GOWASP Hybrid Security Scanner 🎉  ( Beta )
+# GOWASP Hybrid Security Scanner  ~~beta~~
 
 Do you hate reviews.
 
 Do you love CTFs.
 
-Do you hate java contorllers.
+Do you hate java controllers.
 
 Do you love having more time to not look at screens.
 
