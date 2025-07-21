@@ -1,4 +1,4 @@
-# GOWASP Hybrid Security Scanner  ~~beta~~
+# GOWASP Hybrid Security Scanner ~~beta~~
 
 Do you hate reviews.
 
@@ -10,9 +10,9 @@ Do you love having more time to not look at screens.
 
 Do you miss the 90s.
 
-# Read On 
+# Read On
 
-GOWASP is a lightweight, multi-language static analysis tool that detects OWASP Top 10 security issues—and more—in your source code. 
+GOWASP is a lightweight, multi-language static analysis tool that detects OWASP Top 10 security issues—and more—in your source code.
 
 It operates in two modes:
 
@@ -38,7 +38,8 @@ It supports Go, JS, Python, Java, PHP, HTML, and can output in text, JSON, or Ma
 ### Python Orchestrator (`runner__.py`)
 
 -   **Hybrid Analysis:** Combines the Go scanner's static findings with Claude AI's contextual OWASP analysis.
--   **Traceability:** Adds a `source` field (`"gowasp"` or `"claude"`) to every finding in the final report.
+-   **Expert Mode:** Supports multiple, swappable AI analysis profiles (`--profile`) and a repo-level, attacker-perspective threat model (`--threat-model`).
+-   **Traceability:** Adds a `source` field (`"gowasp"` or `"claude-owasp"`) to every finding in the final report.
 -   **Organized Outputs:** Creates a unique output directory for each scanned repository (e.g., `output/dvja_src/`).
 -   **Secure by Default:** Securely reads the `CLAUDE_API_KEY` from your environment, not from the code.
 -   **Flexible Execution:** Supports both safe sequential mode and a faster `--parallel` mode for AI calls.
@@ -116,9 +117,13 @@ python3 runner__.py <repo_path> <scanner_bin> [options]
 
 | Flag | Description |
 | :--- | :--- |
+| `--static-rules` | Comma-separated paths to static rule files (e.g., `rules/rules_core.json,rules/rules_secrets.json`). |
+| `--profile` | Comma-separated list of AI analysis profiles (default: `owasp`). |
+| `--severity` | Minimum severity to report from **both** scanners (e.g., `HIGH`). |
+| `--threat-model` | **Expert Mode:** Perform a repo-level, attacker-perspective threat model. |
 | `--parallel` | Run Claude analysis in parallel (faster, but may hit rate limits). |
-| `--debug` | Enable verbose debug output for both scanners. |
-| `--severity` | Minimum severity to report from the **static scanner only**. |
+| `--verbose` | Show live Claude results and gowasp remediation advice. |
+| `--debug` | Enable verbose debug output for troubleshooting. |
 
 ---
 
@@ -134,7 +139,7 @@ python3 runner__.py <repo_path> <scanner_bin> [options]
 ./scanner --dir ../dvja --severity HIGH --output markdown
 
 # Use multiple rule sets for a deeper static scan
-./scanner --rules=rules/rules_core.json,rules/rules_infra.json --dir .
+./scanner --rules=rules/rules_core.json,rules/rules_secrets.json --dir .
 
 # Only scan files changed in the last git commit
 ./scanner --git-diff --severity MEDIUM
@@ -143,7 +148,7 @@ python3 runner__.py <repo_path> <scanner_bin> [options]
 ### Hybrid AI Orchestrator Examples
 
 ```bash
-# Default (safe, sequential) scan of a repo
+# Default (safe, sequential) OWASP scan of a repo
 python3 runner__.py ../../dvja ./scanner
 
 # Scan a subdirectory, creating an 'output/dvja_src' folder
@@ -152,11 +157,30 @@ python3 runner__.py ../../dvja/src ./scanner
 # Run a faster scan using parallel requests to Claude
 python3 runner__.py ../../WebGoat ./scanner --parallel
 
-# Run a scan with verbose debug logging for troubleshooting
-python3 runner__.py ../../WebGoat ./scanner --debug
+# Run with verbose logging to see live results from both scanners
+python3 runner__.py ../../WebGoat ./scanner --verbose
 
-# Filter the static scan results, but still send all files to Claude for full analysis
-python3 runner__.py ../../WebGoat ./scanner --severity HIGH
+# --- Expert Mode Examples ---
+
+# Use multiple static rule sets (core + secrets) for a deeper static scan
+python3 runner__.py ../../WebGoat ./scanner --static-rules rules/rules_core.json,rules/rules_secrets.json
+
+# Run a different AI analysis profile, like performance
+python3 runner__.py ../../WebGoat ./scanner --profile performance
+
+# Run multiple AI profiles at once (OWASP and performance)
+python3 runner__.py ../../WebGoat ./scanner --profile owasp,performance
+
+# Perform a full, repo-level threat model from an attacker's perspective
+python3 runner__.py ../../WebGoat ./scanner --threat-model
+
+# Power User: Combine everything for a comprehensive review
+python3 runner__.py ../../WebGoat ./scanner \
+  --static-rules rules/rules_core.json,rules/rules_secrets.json \
+  --profile owasp,performance \
+  --severity HIGH \
+  --threat-model \
+  --parallel
 ```
 
 ---
@@ -168,9 +192,10 @@ The Python orchestrator creates a structured output to keep your results organiz
 ```
 output/
 └── <repository_name>/
-    ├── static_findings.json  # Results from the Go scanner
-    ├── ai_findings.json      # Results from Claude AI
-    └── combined_findings.json # Merged and deduplicated results
+    ├── static_findings.json      # Results from the Go scanner
+    ├── ai_findings.json          # Results from all file-by-file AI profiles
+    ├── combined_findings.json    # Merged and deduplicated results
+    └── threat_model_report.json  # (Optional) The expert threat model report
 ```
 
 ---
@@ -179,7 +204,6 @@ output/
 
 1.  **For CI/CD:** Use the standalone `./scanner` with `--exit-high` for fast, free, and automated checks on every commit.
 2.  **For Deep Reviews:** Use the `python3 runner__.py` orchestrator for a comprehensive security assessment before a major release or during a security audit.
-3.  **Start Focused:** Begin with `--severity HIGH` on the standalone scanner to tackle the most critical issues first.
+3.  **Start Focused:** Begin with `--severity HIGH` to tackle the most critical issues first.
 4.  **Reduce Noise:** Use `--ignore` or a `.scannerignore` file to exclude test files, dependencies, and generated code.
-5.  **Trace Findings:** In the `combined_findings.json` file, use the `"source"` field to see whether a vulnerability was found by `"gowasp"` or `"claude"`.
-
+5.  **Trace Findings:** In the `combined_findings.json` file, use the `"source"` field to see whether a vulnerability was found by `"gowasp"` or `"claude-owasp"`.
