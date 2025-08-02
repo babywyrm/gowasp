@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 A multi-stage, 'lite' dynamic code analyzer that uses a Prioritize-Analyze-Synthesize
-pipeline to provide holistic insights into a codebase.
+pipeline to provide holistic insights into a codebase, with an optional payload
+generation stage for verification and testing.
 
 Requires the 'rich' and 'anthropic' libraries:
 pip install rich anthropic
@@ -135,33 +136,51 @@ CODE TO ANALYZE:
         """Creates a dynamic synthesis prompt tailored to the user's question."""
         condensed_findings = [f"- {f.finding} (in {Path(f.file_path).name})" for f in all_findings]
         
-        # Dynamically select the synthesis goal based on the question
         q_lower = question.lower()
         if any(kw in q_lower for kw in ["security", "vulnerability", "threat", "exploit"]):
-            synthesis_goal = """
-1.  **Executive Summary:** A brief, high-level overview of the codebase's security posture.
+            synthesis_goal = """1.  **Executive Summary:** A brief, high-level overview of the codebase's security posture.
 2.  **Top Threat Vectors:** Identify the 3-5 most critical, overarching vulnerability patterns.
 3.  **Strategic Remediation Plan:** Provide a prioritized, actionable plan to address these key patterns."""
         elif any(kw in q_lower for kw in ["performance", "speed", "latency", "bottleneck"]):
-            synthesis_goal = """
-1.  **Performance Profile:** A brief, high-level overview of the codebase's likely performance characteristics.
+            synthesis_goal = """1.  **Performance Profile:** A brief, high-level overview of the codebase's likely performance characteristics.
 2.  **Key Bottlenecks:** Identify the 3-5 most critical, overarching performance anti-patterns.
 3.  **Optimization Strategy:** Provide a prioritized, actionable plan to address these key bottlenecks."""
         else: # Default for general, refactoring, or other questions
-            synthesis_goal = """
-1.  **Architectural Overview:** A brief, high-level summary of the codebase's design and quality.
+            synthesis_goal = """1.  **Architectural Overview:** A brief, high-level summary of the codebase's design and quality.
 2.  **Key Code Smells / Patterns:** Identify the 3-5 most critical, overarching design or maintenance issues.
 3.  **Strategic Refactoring Plan:** Provide a prioritized, actionable plan to improve the codebase's structure and maintainability."""
 
-        return f"""You are a principal software architect providing an executive summary. Based on the user's original question and the list of raw findings from a codebase scan, generate a high-level report.
+        return f"""You are a principal software architect providing an executive summary. Based on the user's original question and the list of raw findings from a codebase scan, generate a high-level report in Markdown with the following sections:
+{synthesis_goal}
 
 Original Question: "{question}"
-
 Raw Findings:
-{chr(10).join(condensed_findings)}
+{chr(10).join(condensed_findings)}"""
 
-Your task is to synthesize these findings. Structure your response in Markdown with the following sections:
-{synthesis_goal}"""
+    @staticmethod
+    def payload_generation(finding: Finding, code_snippet: str) -> str:
+        """Creates a prompt to generate safe, educational payloads for a specific finding."""
+        return f"""You are a security testing expert. For the following vulnerability finding, generate example payloads for both offensive verification (Red Team) and defensive testing (Blue Team). This is for authorized, educational purposes only.
+
+VULNERABILITY CONTEXT:
+File: {finding.file_path}
+Line: {finding.line_number}
+Finding: {finding.finding}
+
+CODE SNIPPET:
+
+TASK:
+Provide your response in a single, clean JSON object with the following structure. Do not include any text outside the JSON.
+{{
+  "red_team_payload": {{
+    "payload": "A simple, non-destructive payload to verify the flaw's existence.",
+    "explanation": "A brief explanation of why this payload works for verification."
+  }},
+  "blue_team_payload": {{
+    "payload": "A payload that can be used in a unit test or WAF rule to test the fix.",
+    "explanation": "A brief explanation of how this payload helps test the defensive measure."
+  }}
+}}"""
 
 class SmartAnalyzer:
     """Orchestrates the multi-stage code analysis process."""
@@ -250,6 +269,46 @@ class SmartAnalyzer:
         self.console.print("[green]✓ Synthesis complete.[/green]\n")
         return response_text or "Failed to generate a synthesis report."
 
+    def run_payload_generation_stage(self, top_findings: List[Finding], debug: bool) -> None:
+        """Optional Stage 4: Generates example payloads for the top findings."""
+        self.console.print("[bold]Optional Stage: Generating example payloads...[/bold]")
+        
+        for i, finding in enumerate(top_findings):
+            self.console.print(f"[[bold]{i+1}/{len(top_findings)}[/bold]] Generating payload for finding in [cyan]{Path(finding.file_path).name}[/cyan]...")
+            
+            try:
+                content_lines = Path(finding.file_path).read_text(encoding='utf-8').splitlines()
+                line_num = finding.line_number or 1
+                start = max(0, line_num - 3)
+                end = min(len(content_lines), line_num + 2)
+                code_snippet = "\n".join(content_lines[start:end])
+            except Exception:
+                code_snippet = "Could not read code snippet."
+
+            prompt = PromptFactory.payload_generation(finding, code_snippet)
+            response_text = self._call_claude(prompt)
+            if not response_text: continue
+
+            if debug: self.console.print(Panel(response_text, title=f"[bold blue]RAW API RESPONSE (Payloads for {Path(finding.file_path).name})[/bold blue]"))
+
+            parsed = parse_json_response(response_text)
+            if parsed:
+                rt_payload = parsed.get("red_team_payload", {})
+                bt_payload = parsed.get("blue_team_payload", {})
+                
+                payload_panel = Panel(
+                    f"[bold red]Red Team (Verification)[/bold red]\n"
+                    f"  [bold]Payload:[/bold] [yellow]`{rt_payload.get('payload', 'N/A')}`[/yellow]\n"
+                    f"  [bold]Explanation:[/bold] {rt_payload.get('explanation', 'N/A')}\n\n"
+                    f"[bold green]Blue Team (Defense Test)[/bold green]\n"
+                    f"  [bold]Payload:[/bold] [yellow]`{bt_payload.get('payload', 'N/A')}`[/yellow]\n"
+                    f"  [bold]Explanation:[/bold] {bt_payload.get('explanation', 'N/A')}",
+                    title=f"[bold]Example Payloads for: {finding.finding}[/bold]",
+                    border_style="magenta"
+                )
+                self.console.print(payload_panel)
+            time.sleep(1)
+
 class OutputManager:
     """Handles the display and saving of the final analysis report."""
     def __init__(self, console: Console):
@@ -310,8 +369,8 @@ Examples:
   # Performance analysis with verbose output
   python smart_analyzer.py /path/to/repo "Find performance bottlenecks" -v
 
-  # Generate HTML and Markdown reports for a refactoring analysis
-  python smart_analyzer.py /path/to/repo "Suggest refactoring improvements" --format html markdown --output refactor_plan
+  # Generate HTML report and example payloads for top 3 findings
+  python smart_analyzer.py /path/to/repo "Threat model this app" --format html --generate-payloads --top-n 3
 
   # Debug the API calls for a specific question
   python smart_analyzer.py /path/to/repo "Find hardcoded secrets" --debug
@@ -324,7 +383,8 @@ Examples:
     parser.add_argument('--format', nargs='*', default=['console'], choices=['console', 'html', 'markdown'], help='One or more output formats.')
     parser.add_argument('-o', '--output', help='Base output file path (e.g., "report"). Suffix is ignored.')
     parser.add_argument('--no-color', action='store_true', help='Disable colorized output.')
-    parser.add_argument('--top-n', type=int, default=5, help='Number of items for summary tables.')
+    parser.add_argument('--top-n', type=int, default=5, help='Number of items for summary tables and payload generation.')
+    parser.add_argument('--generate-payloads', action='store_true', help='Generate example Red/Blue team payloads for top findings.')
     return parser
 
 def get_question_interactively(console: Console) -> str:
@@ -379,6 +439,9 @@ def main() -> None:
         file_formats = [f for f in args.format if f != 'console']
         if file_formats:
             output_manager.save_reports(report, file_formats, args.output)
+
+        if args.generate_payloads and report.insights:
+            analyzer.run_payload_generation_stage(report.insights[:args.top_n], args.debug)
 
     except KeyboardInterrupt:
         console.print("\n\n[bold yellow]Analysis interrupted by user.[/bold yellow]")
