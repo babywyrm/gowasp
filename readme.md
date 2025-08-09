@@ -57,7 +57,8 @@ git clone https://github.com/babywyrm/gowasp.git
 cd gowasp/gowasp
 
 # Build the scanner binary
-go build -o scanner .
+go build -o scanner gowasp.go
+
 ```
 
 ### 2. Set up the Python Orchestrator

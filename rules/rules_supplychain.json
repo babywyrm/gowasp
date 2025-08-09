@@ -1,10 +1,66 @@
 [
   {
+    "name": "Lockfile Ignored in .gitignore",
+    "pattern": "(?m)^/?(package-lock\\.json|yarn\\.lock|composer\\.lock|Pipfile\\.lock|poetry\\.lock|go\\.sum)$",
+    "severity": "CRITICAL",
+    "category": "A08",
+    "description": "A dependency lockfile is present in .gitignore. This defeats the purpose of lockfiles, which is to ensure repeatable and verified builds.",
+    "remediation": "Remove the lockfile entry from your .gitignore file and commit the lockfile to your repository."
+  },
+  {
+    "name": "Curl to Shell Execution in Script",
+    "pattern": "curl\\s+[^|]+\\|\\s*(bash|sh)",
+    "severity": "CRITICAL",
+    "category": "A08",
+    "description": "Downloading a script via curl and executing it directly with a shell is extremely dangerous. The remote script could be compromised to execute malicious code.",
+    "remediation": "Download the script, manually review its contents for safety, and then execute it. Better yet, find an official and more secure installation method."
+  },
+  {
+    "name": "NPM Lifecycle Hook Script",
+    "pattern": "\"(preinstall|postinstall|prepublish)\":\\s*\".+\"",
+    "severity": "HIGH",
+    "category": "A08",
+    "description": "NPM lifecycle scripts (preinstall, postinstall) can execute arbitrary commands and are a common vector for malicious packages.",
+    "remediation": "Carefully audit any package that uses install scripts. Ensure the commands are safe and necessary."
+  },
+  {
+    "name": "Unpinned Docker Base Image",
+    "pattern": "(?im)^FROM\\s+\\S+:[^@\\s]+$",
+    "severity": "HIGH",
+    "category": "A08",
+    "description": "Dockerfile base image is pinned to a mutable tag (e.g., 'latest', '3.14'). This can lead to unpredictable builds and pull in vulnerabilities.",
+    "remediation": "Pin the base image to an immutable digest (e.g., 'image:tag@sha256:...')."
+  },
+  {
+    "name": "Unpinned GitHub Action",
+    "pattern": "uses:\\s*\\S+/\\S+@(main|master|develop|[vV]?[0-9]+(\\.[0-9]+)*)",
+    "severity": "HIGH",
+    "category": "A08",
+    "description": "A GitHub Action is pinned to a mutable reference like a branch (main, master) or a version tag (v1, v3). This could pull in malicious changes.",
+    "remediation": "Pin the action to a specific commit SHA hash for maximum security (e.g., 'uses: actions/checkout@a12b3c...')."
+  },
+  {
+    "name": "Insecure Protocol for Package Installation",
+    "pattern": "(?i)(npm|pip|yarn|go|git|helm)\\s+(install|add|get|clone|repo add)\\s+.*(http|ftp|git)://",
+    "severity": "HIGH",
+    "category": "A06",
+    "description": "Dependencies or repositories are being fetched over an insecure protocol (HTTP, FTP, git). This is vulnerable to Man-in-the-Middle (MitM) attacks.",
+    "remediation": "Always use HTTPS or SSH for fetching dependencies and cloning repositories."
+  },
+  {
+    "name": "Loose NPM Version Pinning",
+    "pattern": "\"[^\"]+\":\\s*\"[\\^~]",
+    "severity": "MEDIUM",
+    "category": "A06",
+    "description": "NPM dependency uses loose versioning (^ or ~). This could automatically pull in a malicious minor or patch update.",
+    "remediation": "Pin dependencies to exact versions or use a lockfile and a tool like Dependabot for controlled updates."
+  },
+  {
     "name": "NPM Wildcard Dependency",
     "pattern": "\"[^\"]+\":\\s*\"\\*\"",
     "severity": "MEDIUM",
     "category": "A06",
-    "description": "Wildcard dependency in package.json",
+    "description": "Wildcard dependency ('*') in package.json allows any version of the package to be installed, which is highly insecure.",
     "remediation": "Pin dependency versions explicitly."
   },
   {
@@ -12,71 +68,15 @@
     "pattern": "\"git\\+https?://[^\"]+\"",
     "severity": "MEDIUM",
     "category": "A06",
-    "description": "Git repo instead of versioned package",
-    "remediation": "Use versioned releases, not direct git URLs."
+    "description": "A dependency points to a Git repository instead of a versioned package from a registry. This makes auditing and verification difficult.",
+    "remediation": "Whenever possible, use versioned releases from a trusted package registry."
   },
   {
-    "name": "HTTP NPM Install",
-    "pattern": "(?i)npm\\s+install\\s+.*http://",
-    "severity": "HIGH",
+    "name": "Potentially Private NPM Package",
+    "pattern": "\"(@[a-zA-Z0-9\\-_]+/[a-zA-Z0-9\\-_]+)\"",
+    "severity": "LOW",
     "category": "A06",
-    "description": "Installing packages over HTTP",
-    "remediation": "Use HTTPS registries only."
-  },
-  {
-    "name": "HTTP PIP Install",
-    "pattern": "(?i)pip\\s+install\\s+.*http://",
-    "severity": "HIGH",
-    "category": "A06",
-    "description": "Installing Python packages over HTTP",
-    "remediation": "Use HTTPS PyPI endpoints."
-  },
-  {
-    "name": "Yarn HTTP Install",
-    "pattern": "(?i)yarn\\s+add\\s+.*http://",
-    "severity": "HIGH",
-    "category": "A06",
-    "description": "Installing packages over HTTP",
-    "remediation": "Use HTTPS registries only."
-  },
-  {
-    "name": "Go Get Latest",
-    "pattern": "(?i)go\\s+get\\s+.*@latest",
-    "severity": "MEDIUM",
-    "category": "A06",
-    "description": "Fetching Go modules without version pin",
-    "remediation": "Pin module to a specific version."
-  },
-  {
-    "name": "Git HTTP Clone",
-    "pattern": "(?i)git\\s+clone\\s+http://",
-    "severity": "HIGH",
-    "category": "A06",
-    "description": "Cloning repos over HTTP",
-    "remediation": "Use HTTPS or SSH for git clones."
-  },
-  {
-    "name": "Unpinned Docker Base Image",
-    "pattern": "(?m)^FROM\\s+\\S+:[^@\\s]+$",
-    "severity": "MEDIUM",
-    "category": "A08",
-    "description": "Dockerfile base image without digest",
-    "remediation": "Pin to an immutable digest (e.g. @sha256:...)."
-  },
-  {
-    "name": "Helm HTTP Repo",
-    "pattern": "(?i)helm\\s+repo\\s+add\\s+\\S+\\s+http://",
-    "severity": "HIGH",
-    "category": "A06",
-    "description": "Adding Helm repo over HTTP",
-    "remediation": "Use HTTPS for Helm repositories."
-  },
-  {
-    "name": "Terraform AWS Hardcoded Key",
-    "pattern": "(?i)access_key\\s*=\\s*\"AKIA[0-9A-Z]{16}\"",
-    "severity": "CRITICAL",
-    "category": "A02",
-    "description": "AWS access key in Terraform",
-    "remediation": "Use IAM roles or environment credentials."
+    "description": "A scoped NPM package is used, which might be an internal package. If the scope is not registered on the public registry, it could be vulnerable to dependency confusion.",
+    "remediation": "Ensure all internal packages are fetched from a private registry and that your organization has registered its scope on public npmjs.org."
   }
 ]
