@@ -1,120 +1,140 @@
 
-# Smart Code Analyzer  ..beta..
+# Smart Code Analyzer ..beta..
 
 ![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Powered by](https://img.shields.io/badge/Powered%20by-Claude%203.5%20Sonnet-orange.svg)
 
-An AI-powered, multi-stage script for deep, contextual analysis of codebases using the Anthropic Claude 3.5 Sonnet API. This tool moves beyond simple file-by-file scanning to provide holistic, synthesized insights and actionable testing payloads.
+An AI-powered, multi-stage script for deep, contextual analysis of codebases using the Anthropic Claude 3.5 Sonnet API.
+This tool goes beyond simple file-by-file scanning to provide **holistic, synthesized insights** and **optional testing payloads** for both Red and Blue teams.
+
+---
 
 ## Overview
 
-Standard static analysis often misses the big picture by looking at files in isolation. This tool solves that problem by mimicking how a human expert works, using a **multi-stage analysis pipeline**:
+Typical static analysis runs on every file, regardless of context — often producing noise.
+**Smart Code Analyzer** works differently:
 
-1.  **Prioritization:** The AI first performs a high-level scan of the repository's file structure to identify the most critical files relevant to your question. This focuses the deep analysis on what matters most.
-2.  **Deep Dive:** It then conducts a detailed, file-by-file analysis on this prioritized subset of files, extracting specific findings and recommendations.
-3.  **Synthesis:** It aggregates all the raw findings and sends them back to the AI in a final pass, asking it to act as a principal architect. The AI's summary is **dynamically tailored** to your question, providing a threat model for security queries or a performance profile for optimization queries.
-4.  **(Optional) Payload Generation:** If requested, the script performs a final pass on the top findings to generate example payloads for both vulnerability verification (Red Team) and defense testing (Blue Team).
+1. **Prioritization** – The AI scans the repo’s structure to find the most relevant files for your query.
+2. **Deep Dive** – It runs a targeted file-by-file analysis on only the prioritized subset.
+3. **Synthesis** – Findings are aggregated into a **dynamic, context-aware final report**:
 
-This approach provides granular details, a high-level strategic summary, and actionable testing materials all in one run.
+   * Security questions → **Threat Model**
+   * Performance questions → **Performance Profile**
+   * Refactoring questions → **Architectural Review**
+4. **Optional Payload Generation** – If enabled, creates **verification** (Red Team) and **defense** (Blue Team) payloads for the top findings.
+5. **Optional YAML/YML Mode** – Skip YAML by default to reduce noise. Use `--include-yaml` to analyze YAML/YML files (e.g., CI/CD workflows, Helm charts) when needed.
 
-## Features
+---
 
--   **Multi-Stage Analysis Pipeline:** Ensures the analysis is both focused and holistic.
--   **AI-Driven Prioritization:** Intelligently focuses deep analysis on the most relevant parts of your codebase.
--   **Dynamic AI Synthesis:** The final summary adapts to your question, generating a **Threat Model** for security questions, a **Performance Profile** for optimization questions, or an **Architectural Review** for refactoring questions.
--   **Red/Blue Team Payload Generation:** An optional `--generate-payloads` flag creates example payloads for top findings, useful for both vulnerability verification and defense testing.
--   **Verbose & Debug Modes:** Use `-v` for real-time findings and `--debug` to see the raw, unparsed API responses for troubleshooting.
--   **Configurable Summaries:** Use the `--top-n` flag to control the number of items in summary tables and for payload generation.
--   **Multiple Report Formats:** Output to the console, HTML, and Markdown.
--   **Automatic Color Detection:** Uses rich, colorized output in supported terminals, with a `--no-color` override.
+## Key Features
 
-## Requirements
+* **Multi-Stage AI Pipeline** – Combines breadth and depth in analysis.
+* **Context-Aware Summaries** – Tailored to your question type.
+* **Red/Blue Payloads** – Generate test payloads for validation & defense.
+* **Multiple Output Formats** – Console, HTML, Markdown.
+* **YAML/YML Toggle** – Analyze YAML/YML files only on demand.
+* **Verbose & Debug Modes** – Detailed output or raw API responses for dev/debug use.
+* **Top-N Control** – Limit the number of findings to focus on critical items.
+* **Color Output** – Auto-detected, with `--no-color` override.
 
-1.  **Python 3.8+**
-2.  **Required Libraries:** `rich` and `anthropic`. Install them with:
-    ```bash
-    pip install rich anthropic
-    ```
-3.  **API Key:** You must have your Anthropic API key set as an environment variable.
-    ```bash
-    export CLAUDE_API_KEY="your_api_key_here"
-    ```
+---
+
+## Installation
+
+1. **Python 3.8+**
+2. **Install dependencies**:
+
+   ```bash
+   pip install rich anthropic
+   ```
+3. **Set your Anthropic API key**:
+
+   ```bash
+   export CLAUDE_API_KEY="your_api_key_here"
+   ```
+
+---
 
 ## Usage
-
-The script takes a repository path and a question as input. If the question is omitted, the script will prompt for it interactively.
 
 ```bash
 python3 smart_analyzer.py -h
 ```
-```
-usage: smart_analyzer.py [-h] [-v] [--debug] [--format [{console,html,markdown} ...]] [-o OUTPUT] [--no-color] [--top-n TOP_N] [--generate-payloads] repo_path [question]
 
-A multi-stage AI code analyzer.
+```
+usage: smart_analyzer.py [-h] [-v] [--debug]
+                         [--format [{console,html,markdown} ...]]
+                         [-o OUTPUT] [--no-color]
+                         [--top-n TOP_N] [--generate-payloads]
+                         [--include-yaml]
+                         repo_path [question]
 
 positional arguments:
   repo_path             Path to the repository to analyze
   question              Analysis question (prompts if not provided)
 
 options:
-  -h, --help            show this help message and exit
-  -v, --verbose         Print detailed insights for each file as they are found.
+  -h, --help            Show this help message and exit.
+  -v, --verbose         Print detailed findings as they are found.
   --debug               Print raw API responses for every call.
   --format [{console,html,markdown} ...]
-                        One or more output formats.
-  -o, --output          Base output file path (e.g., "report"). Suffix is ignored.
+                        Output format(s).
+  -o, --output          Base output filename (suffixes added automatically).
   --no-color            Disable colorized output.
-  --top-n TOP_N         Number of items for summary tables and payload generation.
-  --generate-payloads   Generate example Red/Blue team payloads for top findings.
+  --top-n TOP_N         Limit summary and payload generation to top N findings.
+  --generate-payloads   Generate Red/Blue team payloads for top findings.
+  --include-yaml        Include YAML/YML files in analysis (disabled by default).
 ```
 
 ---
 
-## Demos & Examples
+## Examples
 
-#### 1. Basic Interactive Scan
-
-This is the simplest way to run the analyzer. It will scan the repository and then prompt you to enter your analysis question.
+#### 1. **Basic Interactive Scan**
 
 ```bash
-python3 smart_analyzer.py /path/to/your/repo
-```
-```
-What would you like to analyze about this codebase?
-Examples: 'Find security vulnerabilities', 'Suggest performance improvements', 'How can I refactor this code?'
-Enter your question: How can we improve error handling and logging in this project?
+python3 smart_analyzer.py /path/to/repo
 ```
 
-#### 2. Security Threat Model with Payload Generation
-
-This is the most powerful security feature. It performs a full threat model and then generates example payloads for the top 3 most critical findings.
+#### 2. **Security Threat Model + Payloads**
 
 ```bash
-python3 smart_analyzer.py /path/to/vulnerable-app "Threat model this app for injection and auth vulnerabilities" --generate-payloads --top-n 3
+python3 smart_analyzer.py /path/to/app \
+  "Threat model for injection & auth vulnerabilities" \
+  --generate-payloads --top-n 3
 ```
 
-#### 3. Performance Analysis with Verbose Output
-
-Ask a performance-related question to get a dynamically generated "Performance Profile" in the final synthesis. Use `-v` to see potential bottlenecks as they are found.
+#### 3. **Performance Profile with Verbose Output**
 
 ```bash
-python3 smart_analyzer.py /path/to/your/repo "Find performance bottlenecks and suggest optimizations" -v
+python3 smart_analyzer.py /path/to/app \
+  "Find performance bottlenecks" -v
 ```
 
-#### 4. Generate HTML & Markdown Reports for Refactoring
-
-Ask a high-level architectural question and generate both an HTML and a Markdown file from the results.
+#### 4. **Architectural Review to HTML & Markdown**
 
 ```bash
-python3 smart_analyzer.py /path/to/your/repo "What are the main architectural patterns and where are the potential design flaws?" --format html markdown --output arch_review
+python3 smart_analyzer.py /path/to/app \
+  "Review architecture" --format html markdown --output review
 ```
-This will create `arch_review.html` and `arch_review.md`.
 
-#### 5. Debugging API Responses
-
-If you are developing the script or the prompts, the `--debug` flag is invaluable. It will print the full, raw JSON response from the API for every call.
+#### 5. **Including YAML Files in the Scan**
 
 ```bash
-python3 smart_analyzer.py /path/to/your/repo "Find hardcoded secrets" --debug
+python3 smart_analyzer.py /path/to/app \
+  "Review GitHub Actions for security risks" --include-yaml
 ```
+
+---
+
+## Notes on YAML/YML Analysis
+
+* **By default**, `.yaml` and `.yml` files are **excluded** to avoid irrelevant CI/CD noise.
+* Use `--include-yaml` when:
+
+  * Reviewing **GitHub Actions**, **GitLab CI**, **Helm charts**, **Kubernetes manifests**.
+  * Performing **infrastructure-as-code** audits.
+
+##
+##
