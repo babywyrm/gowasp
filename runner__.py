@@ -32,10 +32,10 @@ SUPPORTED_EXTENSIONS = {
 
 
 class Severity(Enum):
-    CRITICAL = 4
-    HIGH = 3
-    MEDIUM = 2
-    LOW = 1
+    CRITICAL = 1
+    HIGH = 2
+    MEDIUM = 3
+    LOW = 4
 
 
 class Finding(TypedDict, total=False):
@@ -109,7 +109,7 @@ class Orchestrator:
         try:
             finding_level = Severity[finding_severity.upper()].value
             threshold_level = Severity[self.severity].value
-            return finding_level >= threshold_level
+            return finding_level <= threshold_level
         except KeyError:
             return False
 
@@ -336,8 +336,8 @@ class Orchestrator:
 
         combined.sort(
             key=lambda x: (
-                -Severity[x.get("severity", "LOW").upper()].value
-                if x.get("severity", "").upper() in Severity.__members__ else 0,
+                Severity[x.get("severity", "LOW").upper()].value
+                if x.get("severity", "").upper() in Severity.__members__ else 99,
                 x.get("file", ""),
                 str(x.get("line_number", x.get("line", "")))
             )
