@@ -5,21 +5,16 @@ import json
 import time
 import subprocess
 import argparse
-import re
 from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import logging
-from tqdm import tqdm
 import anthropic
 
 # --- Constants and Configuration ---
 CLAUDE_MODEL = "claude-3-5-sonnet-20241022"
 MAX_WORKERS = 4
 MAX_RETRIES = 3
-CHUNK_SIZE = 2000  # lines per chunk for large files
-
 SUPPORTED_EXTENSIONS = {
     '.go': 'go', '.py': 'python', '.java': 'java', '.js': 'javascript',
     '.jsx': 'javascript', '.ts': 'typescript', '.tsx': 'typescript',
@@ -29,22 +24,11 @@ SEVERITY_LEVELS = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
 
 Finding = Dict[str, Any]
 
-# --- Logging Setup ---
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler(sys.stderr)]
-)
-logger = logging.getLogger(__name__)
-
-
 class Orchestrator:
     """
-    Orchestrates security scans using gowasp + Claude AI.
+    Orchestrates security scans using a static Go scanner and the Claude AI.
     """
-    def __init__(self, repo_path: Path, scanner_bin: Path, parallel: bool, debug: bool,
-                 severity: Optional[str], profiles: str, static_rules: Optional[str],
-                 threat_model: bool, verbose: bool):
+    def __init__(self, repo_path: Path, scanner_bin: Path, parallel: bool, debug: bool, severity: Optional[str], profiles: str, static_rules: Optional[str], threat_model: bool, verbose: bool):
         self.repo_path = repo_path.resolve()
         self.scanner_bin = scanner_bin.resolve()
         self.parallel = parallel
@@ -54,23 +38,24 @@ class Orchestrator:
         self.static_rules = static_rules
         self.threat_model = threat_model
         self.verbose = verbose
-
+        
         self.api_key = os.getenv("CLAUDE_API_KEY")
         if not self.api_key:
-            logger.error("CLAUDE_API_KEY environment variable not set.")
+            print("ERROR: CLAUDE_API_KEY environment variable not set.", file=sys.stderr)
             sys.exit(1)
-
+            
         sanitized_repo_name = str(repo_path).strip('/').replace('/', '_')
         self.output_path = Path("output") / sanitized_repo_name
         os.makedirs(self.output_path, exist_ok=True)
-        logger.info(f"Outputs will be saved in: {self.output_path}")
+        print(f"Outputs will be saved in: {self.output_path}")
         if self.severity:
-            logger.info(f"Filtering for minimum severity: {self.severity}")
-        logger.info(f"Using AI analysis profiles: {self.profiles}")
+            print(f"Filtering for minimum severity: {self.severity}")
+        print(f"Using AI analysis profiles: {self.profiles}")
 
         self.prompt_templates = self._load_prompt_templates()
 
     def _load_prompt_templates(self) -> Dict[str, str]:
+        """Loads all requested prompt templates from the prompts/ directory."""
         templates = {}
         profiles_to_load = self.profiles[:]
         if self.threat_model and 'attacker' not in profiles_to_load:
@@ -79,29 +64,22 @@ class Orchestrator:
         for profile in profiles_to_load:
             prompt_file = Path("prompts") / f"{profile}_profile.txt"
             if not prompt_file.is_file():
-                logger.error(f"Prompt file not found: {prompt_file}")
+                print(f"ERROR: Prompt file not found for profile '{profile}'. Expected at: {prompt_file}", file=sys.stderr)
                 sys.exit(1)
             templates[profile] = prompt_file.read_text()
-        logger.info(f"   (Loaded {len(templates)} prompt templates)")
+        print(f"   (Loaded {len(templates)} prompt templates)")
         return templates
 
     def _meets_severity_threshold(self, finding_severity: str) -> bool:
+        """Checks if a finding's severity meets the user's threshold."""
         if not self.severity:
             return True
         finding_level = SEVERITY_LEVELS.get(finding_severity.upper(), 0)
         threshold_level = SEVERITY_LEVELS.get(self.severity, 0)
         return finding_level >= threshold_level
 
-    def _extract_json(self, text: str) -> Optional[Dict[str, Any]]:
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse JSON: {e}")
-        return None
-
     def run_static_scanner(self) -> List[Finding]:
+        """Runs the gowasp scanner and extracts the JSON array from its output."""
         cmd = [str(self.scanner_bin), "--dir", str(self.repo_path), "--output", "json"]
         if self.severity:
             cmd.extend(["--severity", self.severity])
@@ -109,13 +87,11 @@ class Orchestrator:
             cmd.extend(["--rules", self.static_rules])
         if self.verbose:
             cmd.append("--verbose")
-
-        logger.info("1) Running static gowasp scanner...")
-        logger.debug("Running command: %s", " ".join(cmd))
+            
+        print(f"\n1) Running static gowasp scanner...\n   Running: {' '.join(cmd)}")
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
-            logger.warning(f"scanner exited with code {proc.returncode}")
-
+            print(f"WARNING: scanner exited with code {proc.returncode}", file=sys.stderr)
         out = proc.stdout
         start = out.find('[')
         end = out.rfind(']') + 1
@@ -127,6 +103,7 @@ class Orchestrator:
             return []
 
     def _get_files_to_scan(self) -> List[Path]:
+        """Lists all source files for AI analysis, skipping common dependency directories."""
         skip_dirs = {'.git', 'node_modules', '__pycache__', 'vendor', 'build', 'dist'}
         files = []
         for p in self.repo_path.rglob('*'):
@@ -136,82 +113,77 @@ class Orchestrator:
                 files.append(p)
         return sorted(files)
 
-    def _chunk_file(self, file_path: Path) -> List[str]:
-        with file_path.open(encoding="utf-8", errors="replace") as f:
-            lines = f.readlines()
-        if len(lines) <= CHUNK_SIZE:
-            return ["".join(lines)]
-        return [
-            "".join(lines[i:i+CHUNK_SIZE])
-            for i in range(0, len(lines), CHUNK_SIZE)
-        ]
-
     def _analyze_file_with_claude(self, file_path: Path, profile: str) -> Optional[Dict[str, Any]]:
+        """Analyzes a single file with Claude and returns the full parsed JSON object."""
         client = anthropic.Anthropic(api_key=self.api_key)
-        code_chunks = self._chunk_file(file_path)
-
+        code = file_path.read_text(encoding='utf-8', errors='replace')
+        if not code.strip() or len(code) > 100000:
+            return None
+        
         language = SUPPORTED_EXTENSIONS.get(file_path.suffix.lower(), "text")
-        all_findings: List[Finding] = []
+        prompt = self.prompt_templates[profile].format(file_path=file_path, language=language, code=code)
 
-        for chunk in code_chunks:
-            if not chunk.strip():
-                continue
-            prompt = self.prompt_templates[profile].format(file_path=file_path, language=language, code=chunk)
-
-            for attempt in range(MAX_RETRIES):
-                try:
-                    resp = client.messages.create(
-                        model=CLAUDE_MODEL,
-                        max_tokens=3000,
-                        messages=[{"role": "user", "content": prompt}]
-                    )
-                    text = resp.content[0].text.strip()
-                    parsed = self._extract_json(text)
-                    if parsed:
-                        return parsed
-                except anthropic.APIStatusError as e:
-                    if e.status_code == 529 and attempt < MAX_RETRIES - 1:
-                        wait_time = 2 ** (attempt + 1)
-                        logger.warning(f"Claude API overloaded for {file_path}. Retrying in {wait_time}s...")
-                        time.sleep(wait_time)
-                    else:
-                        raise e
-                except Exception as e:
-                    logger.error(f"Unexpected error analyzing {file_path}: {e}")
-                    return None
+        for attempt in range(MAX_RETRIES):
+            try:
+                resp = client.messages.create(model=CLAUDE_MODEL, max_tokens=3000, messages=[{"role": "user", "content": prompt}])
+                text = resp.content[0].text.strip()
+                start = text.find('{')
+                end = text.rfind('}') + 1
+                if start >= 0 and end > start:
+                    return json.loads(text[start:end])
+                return None
+            except anthropic.APIStatusError as e:
+                if e.status_code == 529 and attempt < MAX_RETRIES - 1:
+                    wait_time = 2 ** (attempt + 1)
+                    print(f"WARNING: Claude API overloaded for {file_path}. Retrying in {wait_time}s...", file=sys.stderr)
+                    time.sleep(wait_time)
+                else:
+                    raise e
+            except Exception as e:
+                print(f"ERROR: Unexpected error analyzing {file_path}: {e}", file=sys.stderr)
+                return None
         return None
 
     def _print_live_claude_summary(self, file_path: Path, result: Dict[str, Any], profile: str) -> None:
-        logger.info(f"--- Claude Analysis: {file_path} (Profile: {profile}) ---")
+        """Prints a formatted summary of Claude's findings to stderr for real-time feedback."""
+        print(f"\n--- Claude Live Analysis: {file_path} (Profile: {profile}) ---", file=sys.stderr)
         risk = result.get("overall_risk", "N/A")
+        
         findings_key = next((key for key in result if key.endswith("_findings")), None)
         findings = result.get(findings_key, [])
-        logger.info(f"  Overall Risk: {risk} | Findings: {len(findings)}")
+        
+        print(f"  Overall Risk: {risk} | Findings: {len(findings)}", file=sys.stderr)
         for f in findings:
             sev = f.get('severity', 'UNK')
             title = f.get('title', 'Unknown Issue')
             line = f.get('line_number', '?')
-            logger.info(f"    - [{sev}] {title} (Line: {line})")
+            print(f"    - [{sev}] {title} (Line: {line})", file=sys.stderr)
+        print("--------------------------------------------------\n", file=sys.stderr)
 
     def run_ai_scanner(self) -> List[Finding]:
+        """Runs the Claude analysis for each requested file-based profile."""
         files = self._get_files_to_scan()
         all_ai_findings: List[Finding] = []
         run_mode = "parallel" if self.parallel else "sequential"
-        logger.info(f"2) Running Claude File-by-File Analysis ({run_mode} mode) on {len(files)} files")
+        
+        print(f"\n2) Running Claude File-by-File Analysis...\n   (Running in {run_mode} mode on {len(files)} files)")
 
         file_profiles = [p for p in self.profiles if p != 'attacker']
 
         for profile in file_profiles:
-            logger.info(f"--- Starting AI Profile: {profile} ---")
+            print(f"\n--- Starting AI Profile: {profile} ---")
             profile_findings: List[Finding] = []
 
             def process_and_log(full_result: Optional[Dict[str, Any]], fpath: Path) -> List[Finding]:
                 if not full_result:
                     return []
+                
                 if self.debug or self.verbose:
                     self._print_live_claude_summary(fpath, full_result, profile)
+
                 findings_key = next((key for key in full_result if key.endswith("_findings")), None)
                 original_findings = full_result.get(findings_key, [])
+                
                 processed = []
                 for item in original_findings:
                     if self._meets_severity_threshold(item.get("severity", "")):
@@ -220,132 +192,142 @@ class Orchestrator:
                         processed.append(item)
                 return processed
 
-            iterator = tqdm(files, desc=f"Profile: {profile}", unit="file", disable=not self.verbose)
-
-            for fpath in iterator:
-                try:
-                    full_result = self._analyze_file_with_claude(fpath, profile)
-                    profile_findings.extend(process_and_log(full_result, fpath))
-                    if not self.parallel:
+            if self.parallel:
+                with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                    future_to_file = {executor.submit(self._analyze_file_with_claude, f, profile): f for f in files}
+                    for i, future in enumerate(as_completed(future_to_file), 1):
+                        fpath = future_to_file[future]
+                        print(f"   [{i}/{len(files)}] Processing AI results for {fpath}")
+                        try:
+                            full_result = future.result()
+                            profile_findings.extend(process_and_log(full_result, fpath))
+                        except Exception as e:
+                            print(f"   ERROR analyzing {fpath}: {e}", file=sys.stderr)
+            else:
+                for i, fpath in enumerate(files, 1):
+                    print(f"   [{i}/{len(files)}] Analyzing {fpath} with Claude...")
+                    try:
+                        full_result = self._analyze_file_with_claude(fpath, profile)
+                        profile_findings.extend(process_and_log(full_result, fpath))
                         time.sleep(0.5)
-                except Exception as e:
-                    logger.error(f"Error analyzing {fpath}: {e}")
-
+                    except Exception as e:
+                        print(f"   ERROR analyzing {fpath}: {e}", file=sys.stderr)
+            
             all_ai_findings.extend(profile_findings)
-            logger.info(f"--- Completed AI Profile: {profile}, Found {len(profile_findings)} issues (after filtering) ---")
-
+            print(f"--- Completed AI Profile: {profile}, Found {len(profile_findings)} issues (after filtering) ---")
+            
         return all_ai_findings
 
     def run_threat_model(self) -> None:
-        logger.info("+) Running Attacker-Perspective Threat Model...")
+        """Performs a repo-level threat model with a robust retry mechanism."""
+        print("\n+) Running Expert Mode: Attacker Perspective Threat Model...")
         files = self._get_files_to_scan()
+        
         full_context = "".join(
             f"--- FILE: {fpath} ---\n{fpath.read_text(encoding='utf-8', errors='replace')}\n\n"
             for fpath in files
         )
+        
         if not full_context:
-            logger.warning("No files found for threat model.")
+            print("   No files found to analyze for threat model.")
             return
 
         prompt = self.prompt_templates['attacker'].format(code=full_context)
+        
         for attempt in range(MAX_RETRIES):
             try:
                 client = anthropic.Anthropic(api_key=self.api_key)
-                resp = client.messages.create(
-                    model=CLAUDE_MODEL,
-                    max_tokens=4000,
-                    messages=[{"role": "user", "content": prompt}]
-                )
-                parsed = self._extract_json(resp.content[0].text.strip())
-                if parsed:
+                resp = client.messages.create(model=CLAUDE_MODEL, max_tokens=4000, messages=[{"role": "user", "content": prompt}])
+                text = resp.content[0].text.strip()
+                start = text.find('{')
+                end = text.rfind('}') + 1
+                if start >= 0 and end > start:
+                    report = json.loads(text[start:end])
                     report_file = self.output_path / "threat_model_report.json"
                     with open(report_file, "w") as f:
-                        json.dump(parsed, f, indent=2)
-                    logger.info(f"Threat model report written to {report_file}")
+                        json.dump(report, f, indent=2)
+                    print(f"   → Threat model report written to {report_file}")
                     return
                 else:
-                    logger.error("Claude did not return valid JSON for threat model")
+                    print("   ERROR: Claude did not return a valid JSON object for the threat model.", file=sys.stderr)
                     return
             except anthropic.APIStatusError as e:
                 if e.status_code == 529 and attempt < MAX_RETRIES - 1:
                     wait_time = 20
-                    logger.warning(f"Claude API overloaded for threat model. Retrying in {wait_time}s...")
+                    print(f"WARNING: Claude API overloaded for threat model. Retrying in {wait_time} seconds...", file=sys.stderr)
                     time.sleep(wait_time)
                 else:
-                    logger.error(f"Threat model generation failed: {e}")
+                    print(f"   ERROR: Failed to generate threat model after {attempt + 1} attempts: {e}", file=sys.stderr)
                     return
             except Exception as e:
-                logger.error(f"Threat model error: {e}")
+                print(f"   ERROR: Failed to generate threat model: {e}", file=sys.stderr)
                 return
-        logger.error("All retries failed for threat model generation")
+        print("   ERROR: All retries failed for threat model generation.", file=sys.stderr)
 
     def run(self) -> None:
+        """Executes the full scan and merge workflow."""
         static_findings = self.run_static_scanner()
         static_output_file = self.output_path / "static_findings.json"
         with open(static_output_file, "w") as f:
             json.dump(static_findings, f, indent=2)
-        logger.info(f"{len(static_findings)} static findings written to {static_output_file}")
+        print(f"   → {len(static_findings)} static findings written to {static_output_file}")
 
         ai_findings = self.run_ai_scanner()
         ai_output_file = self.output_path / "ai_findings.json"
         with open(ai_output_file, "w") as f:
             json.dump(ai_findings, f, indent=2)
-        logger.info(f"{len(ai_findings)} AI findings written to {ai_output_file}")
+        print(f"   → {len(ai_findings)} total AI findings written to {ai_output_file}")
 
-        logger.info("3) Merging and deduplicating findings...")
+        print("\n3) Merging and deduplicating findings...")
         combined: List[Finding] = []
         seen: set[Tuple[Any, ...]] = set()
         for f in static_findings + ai_findings:
-            key = (f.get('file'), f.get('category'),
-                   f.get('title', f.get('rule_name', '')),
-                   f.get('line_number', f.get('line')))
+            key = (f.get('file'), f.get('category'), f.get('title', f.get('rule_name', '')), f.get('line_number', f.get('line')))
             if key in seen:
                 continue
             seen.add(key)
             combined.append(f)
-
+        
         combined_output_file = self.output_path / "combined_findings.json"
         with open(combined_output_file, "w") as f:
             json.dump(combined, f, indent=2)
-        logger.info(f"{len(combined)} combined findings written to {combined_output_file}")
+        print(f"   → {len(combined)} combined findings written to {combined_output_file}")
 
         if self.threat_model:
             self.run_threat_model()
 
-
 def main() -> None:
+    """Parses command-line arguments and runs the orchestrator."""
     parser = argparse.ArgumentParser(
         description="Orchestrator for gowasp and Claude scanners.",
         formatter_class=argparse.RawTextHelpFormatter
     )
-    parser.add_argument("repo_path", type=Path, help="Path to repo to scan.")
-    parser.add_argument("scanner_bin", type=Path, help="Path to gowasp scanner binary.")
-    parser.add_argument("--profile", type=str.lower, default="owasp",
-                        help="Comma-separated list of AI profiles (e.g., 'owasp,performance').")
-    parser.add_argument("--static-rules", type=str,
-                        help="Comma-separated paths to static rule files for gowasp.")
-    parser.add_argument("--severity", type=str.upper,
-                        choices=["CRITICAL", "HIGH", "MEDIUM", "LOW"],
-                        help="Minimum severity to report.")
-    parser.add_argument("--threat-model", action="store_true",
-                        help="Perform repo-level attacker-perspective threat model.")
-    parser.add_argument("--parallel", action="store_true",
-                        help="Run Claude analysis in parallel.")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Show progress bars + live results.")
-    parser.add_argument("--debug", action="store_true",
-                        help="Enable debug mode for troubleshooting.")
+    
+    # Positional Arguments
+    parser.add_argument("repo_path", type=Path, help="Path to the repository to scan.")
+    parser.add_argument("scanner_bin", type=Path, help="Path to the gowasp scanner binary.")
+    
+    # Scan Configuration
+    parser.add_argument("--profile", type=str.lower, default="owasp", help="Comma-separated list of AI analysis profiles (e.g., 'owasp,performance').")
+    parser.add_argument("--static-rules", type=str, help="Comma-separated paths to static rule files for the Go scanner.")
+    parser.add_argument("--severity", type=str.upper, choices=["CRITICAL", "HIGH", "MEDIUM", "LOW"], help="Minimum severity to report.")
+    
+    # Expert/Advanced Modes
+    parser.add_argument("--threat-model", action="store_true", help="Perform a repo-level, attacker-perspective threat model.")
+    
+    # Execution & Output Control
+    parser.add_argument("--parallel", action="store_true", help="Run Claude analysis in parallel.")
+    parser.add_argument("--verbose", action="store_true", help="Show live Claude results and gowasp remediation advice.")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode for troubleshooting.")
+    
     args = parser.parse_args()
 
     if not args.repo_path.is_dir():
-        logger.error(f"Error: '{args.repo_path}' is not a directory")
+        print(f"Error: '{args.repo_path}' is not a directory", file=sys.stderr)
         sys.exit(1)
     if not args.scanner_bin.is_file() or not os.access(args.scanner_bin, os.X_OK):
-        logger.error(f"Error: scanner binary '{args.scanner_bin}' not found or not executable")
+        print(f"Error: scanner binary '{args.scanner_bin}' not found or not executable", file=sys.stderr)
         sys.exit(1)
-
-    if args.debug:
-        logger.setLevel(logging.DEBUG)
 
     orchestrator = Orchestrator(
         repo_path=args.repo_path,
@@ -360,7 +342,5 @@ def main() -> None:
     )
     orchestrator.run()
 
-
 if __name__ == "__main__":
     main()
-
