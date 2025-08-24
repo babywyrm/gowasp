@@ -14,19 +14,38 @@ import logging
 from tqdm import tqdm
 import anthropic
 import csv
+from enum import Enum
+from typing import TypedDict
 
 # --- Constants / Configuration ---
 CLAUDE_MODEL = "claude-3-5-sonnet-20241022"
 MAX_WORKERS = 4
 MAX_RETRIES = 3
-CHUNK_SIZE = 2000  # lines per file chunk for AI analysis
+CHUNK_SIZE = 2000  # lines per file chunk
+MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB per file safeguard
+
 SUPPORTED_EXTENSIONS = {
     '.go': 'go', '.py': 'python', '.java': 'java', '.js': 'javascript',
     '.jsx': 'javascript', '.ts': 'typescript', '.tsx': 'typescript',
     '.php': 'php', '.html': 'html', '.htm': 'html', '.css': 'css', '.sql': 'sql',
 }
-SEVERITY_LEVELS = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
-Finding = Dict[str, Any]
+
+
+class Severity(Enum):
+    CRITICAL = 4
+    HIGH = 3
+    MEDIUM = 2
+    LOW = 1
+
+
+class Finding(TypedDict, total=False):
+    severity: str
+    file: str
+    line_number: int
+    category: str
+    title: str
+    source: str
+
 
 # --- Logging Setup ---
 logging.basicConfig(
@@ -38,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 
 class Orchestrator:
-    """Coordinates gowasp static scan, Claude AI per-file analysis, and threat modeling."""
+    """Coordinates gowasp static scan, Claude AI analysis, and threat modeling."""
 
     def __init__(self, repo_path: Path, scanner_bin: Path, parallel: bool, debug: bool,
                  severity: Optional[str], profiles: str, static_rules: Optional[str],
@@ -70,7 +89,7 @@ class Orchestrator:
 
     def _load_prompt_templates(self) -> Dict[str, str]:
         """Load profile-specific AI prompts from prompts/ directory."""
-        templates = {}
+        templates: Dict[str, str] = {}
         profiles_to_load = self.profiles[:]
         if self.threat_model and 'attacker' not in profiles_to_load:
             profiles_to_load.append('attacker')
@@ -79,17 +98,20 @@ class Orchestrator:
             if not prompt_file.is_file():
                 logger.error(f"Prompt file not found: {prompt_file}")
                 sys.exit(1)
-            templates[profile] = prompt_file.read_text()
+            templates[profile] = prompt_file.read_text(encoding="utf-8")
         logger.info(f"   (Loaded {len(templates)} prompt templates)")
         return templates
 
     def _meets_severity_threshold(self, finding_severity: str) -> bool:
-        """Check if a finding meets severity filter threshold."""
+        """Check if finding meets severity filter threshold."""
         if not self.severity:
             return True
-        finding_level = SEVERITY_LEVELS.get(finding_severity.upper(), 0)
-        threshold_level = SEVERITY_LEVELS.get(self.severity, 0)
-        return finding_level >= threshold_level
+        try:
+            finding_level = Severity[finding_severity.upper()].value
+            threshold_level = Severity[self.severity].value
+            return finding_level >= threshold_level
+        except KeyError:
+            return False
 
     def _extract_json(self, text: str) -> Optional[Dict[str, Any]]:
         """Extract JSON object from model output using regex fallback."""
@@ -111,9 +133,11 @@ class Orchestrator:
         if self.verbose:
             cmd.append("--verbose")
         logger.info("1) Running static gowasp scanner...")
-        proc = subprocess.run(cmd, capture_output=True, text=True)
-        if proc.returncode != 0:
-            logger.warning(f"scanner exited with code {proc.returncode}")
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        except subprocess.CalledProcessError as e:
+            logger.error(f"gowasp scanner failed: {e.stderr}")
+            return []
         out = proc.stdout
         start = out.find('[')
         end = out.rfind(']') + 1
@@ -127,12 +151,15 @@ class Orchestrator:
     def _get_files_to_scan(self) -> List[Path]:
         """List source files, excluding dependency/build dirs."""
         skip_dirs = {'.git', 'node_modules', '__pycache__', 'vendor', 'build', 'dist'}
-        files = []
+        files: List[Path] = []
         for p in self.repo_path.rglob('*'):
             if (p.is_file() and
                 p.suffix.lower() in SUPPORTED_EXTENSIONS and
                 not any(skip_dir in p.parts for skip_dir in skip_dirs)):
-                files.append(p)
+                if p.stat().st_size <= MAX_FILE_SIZE:
+                    files.append(p)
+                else:
+                    logger.warning(f"Skipping {p}, file exceeds {MAX_FILE_SIZE} bytes.")
         return sorted(files)
 
     def _chunk_file(self, file_path: Path) -> List[str]:
@@ -154,7 +181,11 @@ class Orchestrator:
         for chunk in code_chunks:
             if not chunk.strip():
                 continue
-            prompt = self.prompt_templates[profile].format(file_path=file_path, language=language, code=chunk)
+            try:
+                prompt = self.prompt_templates[profile].format(file_path=file_path, language=language, code=chunk)
+            except KeyError as e:
+                logger.error(f"Prompt template for {profile} missing placeholder: {e}")
+                return None
             for attempt in range(MAX_RETRIES):
                 try:
                     resp = client.messages.create(
@@ -207,7 +238,7 @@ class Orchestrator:
                     self._print_live_claude_summary(fpath, full_result, profile)
                 findings_key = next((key for key in full_result if key.endswith("_findings")), None)
                 original_findings = full_result.get(findings_key, [])
-                processed = []
+                processed: List[Finding] = []
                 for item in original_findings:
                     if self._meets_severity_threshold(item.get("severity", "")):
                         item['source'] = f'claude-{profile}'
@@ -238,7 +269,11 @@ class Orchestrator:
         if not full_context:
             logger.warning("No files found for threat model.")
             return
-        prompt = self.prompt_templates['attacker'].format(code=full_context)
+        try:
+            prompt = self.prompt_templates['attacker'].format(code=full_context)
+        except KeyError as e:
+            logger.error(f"Attacker template missing placeholder: {e}")
+            return
         for attempt in range(MAX_RETRIES):
             try:
                 client = anthropic.Anthropic(api_key=self.api_key)
@@ -250,7 +285,7 @@ class Orchestrator:
                 parsed = self._extract_json(resp.content[0].text.strip())
                 if parsed:
                     report_file = self.output_path / "threat_model_report.json"
-                    with open(report_file, "w") as f:
+                    with open(report_file, "w", encoding="utf-8") as f:
                         json.dump(parsed, f, indent=2)
                     logger.info(f"Threat model report written to {report_file}")
                     return
@@ -274,13 +309,13 @@ class Orchestrator:
         """Execute static scan, AI analysis, merge, and export findings."""
         static_findings = self.run_static_scanner()
         static_output_file = self.output_path / "static_findings.json"
-        with open(static_output_file, "w") as f:
+        with open(static_output_file, "w", encoding="utf-8") as f:
             json.dump(static_findings, f, indent=2)
         logger.info(f"{len(static_findings)} static findings written to {static_output_file}")
 
         ai_findings = self.run_ai_scanner()
         ai_output_file = self.output_path / "ai_findings.json"
-        with open(ai_output_file, "w") as f:
+        with open(ai_output_file, "w", encoding="utf-8") as f:
             json.dump(ai_findings, f, indent=2)
         logger.info(f"{len(ai_findings)} AI findings written to {ai_output_file}")
 
@@ -288,25 +323,28 @@ class Orchestrator:
         combined: List[Finding] = []
         seen: set[Tuple[Any, ...]] = set()
         for f in static_findings + ai_findings:
-            key = (f.get('file'), f.get('category'),
-                   f.get('title', f.get('rule_name', '')),
-                   f.get('line_number', f.get('line')))
+            key = (
+                Path(f.get('file', '')).as_posix(),
+                f.get('category', '').lower().strip(),
+                f.get('title', f.get('rule_name', '')).lower().strip(),
+                str(f.get('line_number', f.get('line', '')))
+            )
             if key in seen:
                 continue
             seen.add(key)
             combined.append(f)
 
-        # sort by severity (CRITICAL->LOW), then file/line
         combined.sort(
             key=lambda x: (
-                -SEVERITY_LEVELS.get(x.get("severity", "").upper(), 0),
+                -Severity[x.get("severity", "LOW").upper()].value
+                if x.get("severity", "").upper() in Severity.__members__ else 0,
                 x.get("file", ""),
                 str(x.get("line_number", x.get("line", "")))
             )
         )
 
         combined_output_file = self.output_path / "combined_findings.json"
-        with open(combined_output_file, "w") as f:
+        with open(combined_output_file, "w", encoding="utf-8") as f:
             json.dump(combined, f, indent=2)
         logger.info(f"{len(combined)} combined findings written to {combined_output_file}")
 
@@ -357,7 +395,7 @@ def main() -> None:
     parser.add_argument("--static-rules", type=str,
                         help="Comma-separated paths to static rule files for gowasp.")
     parser.add_argument("--severity", type=str.upper,
-                        choices=["CRITICAL", "HIGH", "MEDIUM", "LOW"],
+                        choices=[s.name for s in Severity],
                         help="Minimum severity to report.")
     parser.add_argument("--threat-model", action="store_true",
                         help="Perform repo-level attacker-perspective threat model.")
