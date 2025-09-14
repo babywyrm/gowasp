@@ -8,6 +8,7 @@
 *.out
 scanner
 *output*
+*.gowasp.cache*
 
 # Output binaries
 /bin/
