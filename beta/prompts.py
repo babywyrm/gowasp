@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Centralized prompt builders for SmartAnalyzer.
+Keeping prompts separate makes the core pipeline lighter and easier to maintain.
 """
 
 from __future__ import annotations
@@ -14,7 +15,6 @@ class PromptFactory:
     """Generates dynamic prompts for each stage of the analysis."""
 
     @staticmethod
-    # NEW: Added a 'limit' parameter to control the number of files
     def prioritization(all_files: List[Path], question: str, limit: int) -> str:
         filenames = [f.name for f in all_files]
         return f"""You are a lead software architect. Your task is to identify the most critical files to analyze to answer the user's question.
@@ -38,12 +38,11 @@ Example:
     }}
   ]
 }}"""
-    
-    # ... (the rest of the file is unchanged) ...
+
     @staticmethod
     def deep_dive(file_path: Path, content: str, question: str) -> str:
-        """Generic code prompt (Go/Java/Python/JS/etc.)."""
-        return f"""You are a Principal Software Engineer with 15 years of experience, specializing in secure and maintainable code. Your analysis must be pragmatic and consider real-world trade-offs. Analyze the following code in the context of the user's question.
+        """Generic code prompt with enhanced AppSec requirements."""
+        return f"""You are a Principal Application Security Engineer. Your analysis must be meticulous, pragmatic, and map to industry standards. Analyze the following code in the context of the user's question.
 
 FILE: {file_path}
 QUESTION: {question}
@@ -53,11 +52,12 @@ Provide your analysis in this exact JSON format. Your entire response must be ON
   "relevance": "HIGH|MEDIUM|LOW|NONE",
   "insights": [
     {{
-      "finding": "A concise description of the specific issue or pattern.",
-      "impact": "CRITICAL|HIGH|MEDIUM|LOW - The potential business or security impact if this is left unaddressed.",
-      "confidence": "HIGH|MEDIUM|LOW - How certain you are that this is a genuine issue.",
-      "effort": "HIGH|MEDIUM|LOW - The estimated effort required to fix this.",
+      "finding": "A concise description of the specific security weakness.",
+      "impact": "CRITICAL|HIGH|MEDIUM|LOW",
+      "confidence": "HIGH|MEDIUM|LOW",
+      "effort": "HIGH|MEDIUM|LOW",
       "line_number": 45,
+      "cwe": "CWE-ID (e.g., 'CWE-89' for SQL Injection). If not applicable or unsure, use 'N/A'.",
       "recommendation": "A specific, actionable recommendation with a brief 'why'."
     }}
   ]
@@ -86,6 +86,7 @@ Provide a concise analysis in THIS EXACT JSON format. Respond ONLY with the JSON
       "confidence": "HIGH|MEDIUM|LOW",
       "effort": "HIGH|MEDIUM|LOW",
       "line_number": 1,
+      "cwe": "CWE-ID (e.g., 'CWE-22'). If not applicable or unsure, use 'N/A'.",
       "recommendation": "Specific, actionable remediation or validation."
     }}
   ]
@@ -113,12 +114,38 @@ Provide a concise analysis in THIS EXACT JSON format. Respond ONLY with the JSON
       "confidence": "HIGH|MEDIUM|LOW",
       "effort": "HIGH|MEDIUM|LOW",
       "line_number": 1,
+      "cwe": "CWE-ID. If not applicable or unsure, use 'N/A'.",
       "recommendation": "Action to fix or validate."
     }}
   ]
 }}
 HELM TEMPLATE TO ANALYZE:
 {content}"""
+    
+    @staticmethod
+    def annotation(finding: Any, code_content: str) -> str:
+        """Generates a focused, annotated code snippet for a specific finding."""
+        return f"""You are a secure coding expert providing feedback in a code review. Your task is to create an annotated code snippet for a specific security finding.
+
+SECURITY FINDING:
+- File: {finding.file_path}
+- Line: {finding.line_number}
+- Description: {finding.finding}
+- Recommendation: {finding.recommendation}
+
+FULL CODE CONTENT:
+{code_content}
+
+INSTRUCTIONS:
+1.  Extract a code snippet of 10-15 lines centered around the vulnerable line ({finding.line_number}).
+2.  Add a comment directly above the vulnerable line: `// FLAW: [Brief summary of the flaw]`
+3.  Add a comment block directly below the vulnerable line showing the corrected code: `// FIX: \n// [Corrected code line(s)]`
+
+Provide your response in a single, clean JSON object with one key, "annotated_snippet". Do not include any text outside the JSON.
+Example format:
+{{
+  "annotated_snippet": "public void insecureMethod(String userInput) {{\\n    // ... some code ...\\n    // FLAW: This line is vulnerable to SQL Injection.\\n    Statement stmt = conn.createStatement();\\n    ResultSet rs = stmt.executeQuery(\\"SELECT * FROM users WHERE name = '\" + userInput + \"'\\");\\n    // FIX:\\n    // PreparedStatement ps = conn.prepareStatement(\\"SELECT * FROM users WHERE name = ?\\");\\n    // ps.setString(1, userInput);\\n    // ResultSet rs = ps.executeQuery();\\n    // ... more code ...\\n}}"
+}}"""
 
     @staticmethod
     def synthesis(all_findings: list, question: str) -> str:
