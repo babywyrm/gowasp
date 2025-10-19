@@ -1,0 +1,23 @@
+{
+  "stage": "payload",
+  "file": "WebGoat/src/main/java/org/owasp/webgoat/webwolf/FileServer.java",
+  "prompt": "You are a security testing expert. For the following vulnerability finding, generate example payloads for both offensive verification (Red Team) and defensive testing (Blue Team). This is for authorized, educational purposes only.\n\nVULNERABILITY CONTEXT:\nFile: WebGoat/src/main/java/org/owasp/webgoat/webwolf/FileServer.java\nLine: 85\nFinding: Unrestricted file upload vulnerability - no file type validation\n\nCODE SNIPPET:\n/*\n * SPDX-FileCopyrightText: Copyright \u00a9 2017 WebGoat authors\n * SPDX-License-Identifier: GPL-2.0-or-later\n */\npackage org.owasp.webgoat.webwolf;\n\nimport static java.util.Comparator.comparing;\nimport static org.springframework.http.MediaType.ALL_VALUE;\n\nimport jakarta.servlet.http.HttpServletRequest;\nimport java.io.File;\nimport java.io.IOException;\nimport java.io.InputStream;\nimport java.nio.file.Files;\nimport java.nio.file.attribute.FileTime;\nimport java.time.ZonedDateTime;\nimport java.time.fo\n\nTASK:\nProvide your response in a single, clean JSON object with the following structure. Do not include any text outside the JSON.\n{\n  \"red_team_payload\": {\n    \"payload\": \"A simple, non-destructive payload to verify the flaw's existence.\",\n    \"explanation\": \"A brief explanation of why this payload works for verification.\"\n  },\n  \"blue_team_payload\": {\n    \"payload\": \"A payload that can be used in a unit test or WAF rule to test the fix.\",\n    \"explanation\": \"A brief explanation of how this payload helps test the defensive measure.\"\n  }\n}",
+  "raw_response": "{\n  \"red_team_payload\": {\n    \"payload\": \"test.jsp;.txt\",\n    \"explanation\": \"This payload attempts to upload a file with a double extension that could bypass simple extension filters while potentially executing as JSP. The .txt helps bypass basic blocklists while the semicolon may be interpreted differently by the server.\"\n  },\n  \"blue_team_payload\": {\n    \"payload\": [\"malicious.php.jpg\", \"../../etc/passwd.jpg\", \"shell.aspx;.png\", \"test.svg\", \"<script>alert(1)</script>.png\"],\n    \"explanation\": \"This test suite checks multiple bypass techniques: double extensions, directory traversal, semicolon injection, SVG files (which can contain scripts), and XSS in filenames. A proper fix should reject all of these patterns.\"\n  }\n}",
+  "parsed": {
+    "red_team_payload": {
+      "payload": "test.jsp;.txt",
+      "explanation": "This payload attempts to upload a file with a double extension that could bypass simple extension filters while potentially executing as JSP. The .txt helps bypass basic blocklists while the semicolon may be interpreted differently by the server."
+    },
+    "blue_team_payload": {
+      "payload": [
+        "malicious.php.jpg",
+        "../../etc/passwd.jpg",
+        "shell.aspx;.png",
+        "test.svg",
+        "<script>alert(1)</script>.png"
+      ],
+      "explanation": "This test suite checks multiple bypass techniques: double extensions, directory traversal, semicolon injection, SVG files (which can contain scripts), and XSS in filenames. A proper fix should reject all of these patterns."
+    }
+  },
+  "timestamp": "2025-10-19T01:25:15.000455+00:00"
+}

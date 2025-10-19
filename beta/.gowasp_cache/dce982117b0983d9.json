@@ -1,0 +1,51 @@
+{
+  "stage": "prioritization",
+  "file": null,
+  "prompt": "You are a lead software architect. Your task is to identify the most critical files to analyze to answer the user's question.\n\nUser Question: \"lets analyze this repo and prioritize the top 10 most impactful issues team.. we're an expert AppSec principal engg... make it verbose\"\n\nFile List:\n[\n  \"AjaxAuthenticationEntryPoint.java\",\n  \"AsciiDoctorTemplateResolver.java\",\n  \"CurrentUser.java\",\n  \"DatabaseConfiguration.java\",\n  \"FileServer.java\",\n  \"HammerHead.java\",\n  \"LessonDataSource.java\",\n  \"LessonResourceScanner.java\",\n  \"LessonTemplateResolver.java\",\n  \"MvcConfiguration.java\",\n  \"MvcConfiguration.java\",\n  \"ParentConfig.java\",\n  \"StartWebGoat.java\",\n  \"UserInterceptor.java\",\n  \"WebGoat.java\",\n  \"WebSecurityConfig.java\",\n  \"WebSecurityConfig.java\",\n  \"WebWolf.java\",\n  \"WebWolfRedirect.java\"\n]\n\nReturn a JSON object with a single key \"prioritized_files\". This key should contain a list of objects, where each object has a \"file_name\" and a \"reason\" explaining its relevance. Limit the list to the top 15 most relevant files. Your response must contain ONLY the JSON object.\nExample:\n{\n  \"prioritized_files\": [\n    {\n      \"file_name\": \"UserService.java\",\n      \"reason\": \"This file likely handles user creation and authentication, which is central to the user's security question.\"\n    },\n    {\n      \"file_name\": \"JwtUtil.java\",\n      \"reason\": \"This file probably manages JWT token generation and validation, a critical component of authorization.\"\n    }\n  ]\n}",
+  "raw_response": "{\n  \"prioritized_files\": [\n    {\n      \"file_name\": \"WebSecurityConfig.java\",\n      \"reason\": \"Primary security configuration file that defines authentication, authorization rules, and security filters. Critical for identifying security misconfigurations and vulnerabilities.\"\n    },\n    {\n      \"file_name\": \"AjaxAuthenticationEntryPoint.java\",\n      \"reason\": \"Handles authentication for AJAX requests. Could contain security issues related to authentication bypass or improper error handling.\"\n    },\n    {\n      \"file_name\": \"FileServer.java\",\n      \"reason\": \"File handling operations are common sources of security vulnerabilities like path traversal, unrestricted file upload, or information disclosure.\"\n    },\n    {\n      \"file_name\": \"DatabaseConfiguration.java\",\n      \"reason\": \"Database configuration can expose security issues like hardcoded credentials, improper connection pooling, or SQL injection vulnerabilities.\"\n    },\n    {\n      \"file_name\": \"CurrentUser.java\",\n      \"reason\": \"Manages user session and context. Potential issues with session management, privilege escalation, or improper access control.\"\n    },\n    {\n      \"file_name\": \"LessonDataSource.java\",\n      \"reason\": \"Custom data source implementation might have security implications for data access and SQL operations.\"\n    },\n    {\n      \"file_name\": \"WebGoat.java\",\n      \"reason\": \"Main application class likely containing critical initialization and configuration that could affect overall application security.\"\n    },\n    {\n      \"file_name\": \"UserInterceptor.java\",\n      \"reason\": \"Intercepts user requests - potential location for authentication/authorization bypass vulnerabilities or CSRF issues.\"\n    },\n    {\n      \"file_name\": \"HammerHead.java\",\n      \"reason\": \"Based on the name, might handle request processing or testing - potential source of DoS or injection vulnerabilities.\"\n    },\n    {\n      \"file_name\": \"WebWolf.java\",\n      \"reason\": \"Appears to be a testing component - could contain security-sensitive testing code or configurations.\"\n    }\n  ]\n}",
+  "parsed": {
+    "prioritized_files": [
+      {
+        "file_name": "WebSecurityConfig.java",
+        "reason": "Primary security configuration file that defines authentication, authorization rules, and security filters. Critical for identifying security misconfigurations and vulnerabilities."
+      },
+      {
+        "file_name": "AjaxAuthenticationEntryPoint.java",
+        "reason": "Handles authentication for AJAX requests. Could contain security issues related to authentication bypass or improper error handling."
+      },
+      {
+        "file_name": "FileServer.java",
+        "reason": "File handling operations are common sources of security vulnerabilities like path traversal, unrestricted file upload, or information disclosure."
+      },
+      {
+        "file_name": "DatabaseConfiguration.java",
+        "reason": "Database configuration can expose security issues like hardcoded credentials, improper connection pooling, or SQL injection vulnerabilities."
+      },
+      {
+        "file_name": "CurrentUser.java",
+        "reason": "Manages user session and context. Potential issues with session management, privilege escalation, or improper access control."
+      },
+      {
+        "file_name": "LessonDataSource.java",
+        "reason": "Custom data source implementation might have security implications for data access and SQL operations."
+      },
+      {
+        "file_name": "WebGoat.java",
+        "reason": "Main application class likely containing critical initialization and configuration that could affect overall application security."
+      },
+      {
+        "file_name": "UserInterceptor.java",
+        "reason": "Intercepts user requests - potential location for authentication/authorization bypass vulnerabilities or CSRF issues."
+      },
+      {
+        "file_name": "HammerHead.java",
+        "reason": "Based on the name, might handle request processing or testing - potential source of DoS or injection vulnerabilities."
+      },
+      {
+        "file_name": "WebWolf.java",
+        "reason": "Appears to be a testing component - could contain security-sensitive testing code or configurations."
+      }
+    ]
+  },
+  "timestamp": "2025-10-19T00:47:16.939542+00:00"
+}
