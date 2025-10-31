@@ -229,3 +229,32 @@ Provide your response in this exact JSON format. Respond ONLY with the JSON obje
 
 CODE TO ANALYZE:
 {content}"""
+
+    @staticmethod
+    def full_code_optimization(
+        file_path: Path, content: str, improvements: List[dict]
+    ) -> str:
+        """Generate a fully rewritten, optimized version of the code."""
+        improvements_summary = "\n".join([
+            f"- Line {imp.get('line_number', '?')}: {imp.get('finding', imp.get('explanation', 'N/A'))}"
+            for imp in improvements
+        ])
+        
+        return f"""You are a Python code optimization expert. Rewrite the following Python file incorporating ALL the improvements listed below.
+
+FILE: {file_path}
+
+IMPROVEMENTS TO APPLY:
+{improvements_summary}
+
+INSTRUCTIONS:
+1. Rewrite the ENTIRE file with all improvements applied
+2. Maintain all existing functionality
+3. Preserve comments and docstrings (improve them if needed)
+4. Ensure the code is production-ready
+5. Return ONLY the improved Python code, no explanations
+
+ORIGINAL CODE:
+{content}
+
+Return the complete, optimized Python file:"""

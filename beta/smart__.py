@@ -13,6 +13,7 @@ Stages:
 from __future__ import annotations
 
 import argparse
+import difflib
 import hashlib
 import html
 import json
@@ -470,6 +471,84 @@ class SmartAnalyzer:
         )
         return improvements_by_file
 
+    def generate_optimized_files(
+        self,
+        improvements_by_file: Dict[str, List[dict]],
+        original_files: List[Path],
+        debug: bool
+    ) -> Dict[str, str]:
+        """Generate full optimized versions of files with improvements."""
+        self.console.print(
+            "\n[bold cyan]Generating Optimized Code Files...[/bold cyan]"
+        )
+        optimized_code: Dict[str, str] = {}
+        
+        for file_path, improvements in improvements_by_file.items():
+            if not improvements:
+                continue
+            
+            # Only generate for HIGH impact improvements
+            high_impact = [
+                imp for imp in improvements if imp.get("impact") == "HIGH"
+            ]
+            if not high_impact:
+                self.console.print(
+                    f"[dim]Skipping {Path(file_path).name} "
+                    f"(no HIGH impact changes)[/dim]"
+                )
+                continue
+            
+            self.console.print(
+                f"Generating optimized version of {Path(file_path).name}..."
+            )
+            
+            try:
+                content = Path(file_path).read_text(
+                    encoding="utf-8", errors="replace"
+                )
+            except OSError as e:
+                self.console.print(f"  [red]Error reading {file_path}: {e}[/red]")
+                continue
+            
+            prompt = PromptFactory.full_code_optimization(
+                Path(file_path), content, improvements
+            )
+            raw = self._call_claude(
+                "full_optimization", str(file_path), prompt, max_tokens=8000
+            )
+            
+            if not raw:
+                continue
+            
+            if debug:
+                self.console.print(
+                    Panel(
+                        raw[:500] + "...",
+                        title=f"RAW API RESPONSE (Optimized {Path(file_path).name})"
+                    )
+                )
+            
+            # Extract code from markdown fences if present
+            code = raw
+            if "```python" in raw:
+                start = raw.find("```python") + 9
+                end = raw.rfind("```")
+                if start > 8 and end > start:
+                    code = raw[start:end].strip()
+            elif "```" in raw:
+                start = raw.find("```") + 3
+                end = raw.rfind("```")
+                if start > 2 and end > start:
+                    code = raw[start:end].strip()
+            
+            optimized_code[file_path] = code
+            self.console.print(
+                f"  [green]✓ Generated optimized {Path(file_path).name}[/green]"
+            )
+            time.sleep(1)
+        
+        return optimized_code
+
 
 # ---------- Output ----------
 class OutputManager:
@@ -567,6 +646,32 @@ class OutputManager:
                         )
                     )
 
+    def display_diff(
+        self, original_path: str, original_code: str, optimized_code: str
+    ) -> None:
+        """Display a unified diff between original and optimized code."""
+        original_lines = original_code.splitlines(keepends=True)
+        optimized_lines = optimized_code.splitlines(keepends=True)
+        
+        diff = difflib.unified_diff(
+            original_lines,
+            optimized_lines,
+            fromfile=f"a/{Path(original_path).name}",
+            tofile=f"b/{Path(original_path).name}",
+            lineterm=""
+        )
+        
+        diff_text = "".join(diff)
+        if diff_text:
+            self.console.print(
+                Syntax(
+                    diff_text,
+                    "diff",
+                    theme="monokai",
+                    line_numbers=False
+                )
+            )
+
     def save_reports(
         self, report: AnalysisReport, formats: List[str], output_base: Optional[str]
     ) -> None:
@@ -629,6 +734,91 @@ class OutputManager:
         except Exception as e:
             self.console.print(f"[red]Error saving optimization report: {e}[/red]")
 
+    def write_optimized_files(
+        self,
+        optimized_code: Dict[str, str],
+        output_dir: Path,
+        repo_path: Path,
+        show_diff: bool
+    ) -> None:
+        """Write optimized code files to output directory."""
+        if not optimized_code:
+            self.console.print(
+                "[yellow]No optimized files to write.[/yellow]"
+            )
+            return
+        
+        output_dir.mkdir(parents=True, exist_ok=True)
+        self.console.print(
+            f"\n[bold cyan]Writing Optimized Files to {output_dir}[/bold cyan]"
+        )
+        
+        repo_path = Path(repo_path).resolve()
+        written_files = []
+        
+        for original_path, code in optimized_code.items():
+            original = Path(original_path).resolve()
+            
+            # Preserve directory structure relative to repo
+            try:
+                relative = original.relative_to(repo_path)
+            except ValueError:
+                # File is outside repo, just use filename
+                relative = original.name
+            
+            output_file = output_dir / relative
+            output_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Show diff if requested
+            if show_diff:
+                try:
+                    original_code = original.read_text(encoding="utf-8")
+                    self.console.print(
+                        f"\n[bold yellow]Diff for {relative}:[/bold yellow]"
+                    )
+                    self.display_diff(str(original_path), original_code, code)
+                except Exception as e:
+                    self.console.print(
+                        f"[red]Could not generate diff for {relative}: {e}[/red]"
+                    )
+            
+            try:
+                output_file.write_text(code, encoding="utf-8")
+                written_files.append(str(relative))
+                self.console.print(
+                    f"  [green]✓[/green] {relative}"
+                )
+            except Exception as e:
+                self.console.print(
+                    f"  [red]✗[/red] {relative}: {e}"
+                )
+        
+        if written_files:
+            self.console.print(
+                f"\n[green]✓ Wrote {len(written_files)} optimized file(s)[/green]"
+            )
+            
+            # Create a summary file
+            summary_file = output_dir / "OPTIMIZATIONS.md"
+            summary = [
+                "# Optimized Files\n",
+                f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n",
+                "## Files Modified\n\n"
+            ]
+            for file in written_files:
+                summary.append(f"- `{file}`\n")
+            summary.append(
+                "\n## Next Steps\n\n"
+                "1. Review each optimized file carefully\n"
+                "2. Run tests to ensure functionality is preserved\n"
+                "3. Create a backup of originals before replacing\n"
+                "4. Use `diff` to compare changes\n"
+            )
+            summary_file.write_text("".join(summary), encoding="utf-8")
+            self.console.print(
+                f"[dim]Summary saved to {summary_file.name}[/dim]"
+            )
+
 
 # ---------- Interactivity ----------
 def clarify_question_interactively(question: str, console: Console) -> str:
@@ -689,7 +879,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--debug", action="store_true", help="Print raw API responses")
     
-    # NEW: Code optimization flags
+    # Code optimization flags
     p.add_argument(
         "--optimize",
         action="store_true",
@@ -700,6 +890,16 @@ def create_parser() -> argparse.ArgumentParser:
         nargs="*",
         choices=["typing", "readability", "security", "performance", "pythonic"],
         help="Focus areas for code optimization (default: all). Only used with --optimize"
+    )
+    p.add_argument(
+        "--optimize-output",
+        metavar="DIR",
+        help="Write optimized Python files to this directory (requires --optimize)"
+    )
+    p.add_argument(
+        "--diff",
+        action="store_true",
+        help="Show unified diff of changes when writing optimized files (requires --optimize-output)"
     )
     
     return p
@@ -810,7 +1010,7 @@ def main() -> None:
     if args.generate_payloads and top_findings_for_action:
         analyzer.run_payload_generation_stage(top_findings_for_action, args.debug)
 
-    # NEW: Code optimization stage (ONLY runs if --optimize flag is set)
+    # Code optimization stage (ONLY runs if --optimize flag is set)
     improvements = {}
     if args.optimize:
         focus_areas = args.focus or []
@@ -822,10 +1022,25 @@ def main() -> None:
         if improvements:
             out.display_code_improvements(improvements)
             
-            # Save improvements to file if requested
+            # Save improvements report
             if args.output:
-                improvement_output = Path(args.output).with_suffix(".optimization.md")
+                improvement_output = Path(args.output).with_suffix(
+                    ".optimization.md"
+                )
                 out.save_improvement_report(improvements, improvement_output)
+            
+            # Generate and write optimized files
+            if args.optimize_output:
+                optimized_code = analyzer.generate_optimized_files(
+                    improvements, files_to_analyze, args.debug
+                )
+                if optimized_code:
+                    out.write_optimized_files(
+                        optimized_code,
+                        Path(args.optimize_output),
+                        repo_path,
+                        args.diff
+                    )
 
     if args.save_conversations:
         cache.save_session_log()
