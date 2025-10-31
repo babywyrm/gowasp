@@ -1,0 +1,39 @@
+{
+  "stage": "deep_dive",
+  "file": "WebGoat/src/main/java/org/owasp/webgoat/lessons/securitymisconfiguration/ActuatorExposureTask.java",
+  "prompt": "You are a Principal Application Security Engineer. Your analysis must be meticulous, pragmatic, and map to industry standards. Analyze the following code in the context of the user's question.\n\nFILE: WebGoat/src/main/java/org/owasp/webgoat/lessons/securitymisconfiguration/ActuatorExposureTask.java\nQUESTION: Enter analysis question: ok lets do a security deep dive and focus on prioritizing fixes and triaging the most important issues... thanks team, focusing specifically on Dependency & Configuration Issues.\n\nProvide your analysis in this exact JSON format. Your entire response must be ONLY the JSON object.\n{\n  \"relevance\": \"HIGH|MEDIUM|LOW|NONE\",\n  \"insights\": [\n    {\n      \"finding\": \"A concise description of the specific security weakness.\",\n      \"impact\": \"CRITICAL|HIGH|MEDIUM|LOW\",\n      \"confidence\": \"HIGH|MEDIUM|LOW\",\n      \"effort\": \"HIGH|MEDIUM|LOW\",\n      \"line_number\": 45,\n      \"cwe\": \"CWE-ID (e.g., 'CWE-89' for SQL Injection). If not applicable or unsure, use 'N/A'.\",\n      \"recommendation\": \"A specific, actionable recommendation with a brief 'why'.\"\n    }\n  ]\n}\n\nCODE TO ANALYZE:\n/*\n * SPDX-FileCopyrightText: Copyright \u00a9 2025 WebGoat authors\n * SPDX-License-Identifier: GPL-2.0-or-later\n */\npackage org.owasp.webgoat.lessons.securitymisconfiguration;\n\nimport static org.owasp.webgoat.container.assignments.AttackResultBuilder.failed;\nimport static org.owasp.webgoat.container.assignments.AttackResultBuilder.success;\n\nimport java.util.Map;\nimport org.owasp.webgoat.container.assignments.AssignmentEndpoint;\nimport org.owasp.webgoat.container.assignments.AssignmentHints;\nimport org.owasp.webgoat.container.assignments.AttackResult;\nimport org.springframework.http.MediaType;\nimport org.springframework.web.bind.annotation.GetMapping;\nimport org.springframework.web.bind.annotation.PostMapping;\nimport org.springframework.web.bind.annotation.RequestParam;\nimport org.springframework.web.bind.annotation.RestController;\n\n/** Task showing exposed actuator/admin endpoints leaking secrets. */\n@RestController\n@AssignmentHints({\n    \"securitymisconfiguration.task3.hint1\",\n    \"securitymisconfiguration.task3.hint2\"\n})\npublic class ActuatorExposureTask implements AssignmentEndpoint {\n\n  static final String LEAKED_API_KEY = \"INTERNAL-API-KEY-987\";\n\n  @GetMapping(\n      value = \"/SecurityMisconfiguration/task3/actuator/env\",\n      produces = MediaType.APPLICATION_JSON_VALUE)\n  public Map<String, Object> actuatorEnv() {\n    return Map.of(\n        \"name\", \"webgoat-staging\",\n        \"profiles\", new String[] {\"staging\", \"debug\"},\n        \"systemApiKey\", LEAKED_API_KEY,\n        \"features\", Map.of(\"betaUi\", true, \"payments\", false));\n  }\n\n  @GetMapping(\n      value = \"/SecurityMisconfiguration/task3/actuator/health\",\n      produces = MediaType.APPLICATION_JSON_VALUE)\n  public Map<String, Object> actuatorHealth() {\n    return Map.of(\n        \"status\", \"UP\",\n        \"checks\",\n            Map.of(\n                \"database\", Map.of(\"status\", \"UP\", \"responseTimeMs\", 12),\n                \"cache\", Map.of(\"status\", \"UP\", \"hitRatio\", 0.91)));\n  }\n\n  @PostMapping(\n      value = \"/SecurityMisconfiguration/task3\",\n      consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)\n  public AttackResult submitApiKey(@RequestParam(\"apiKey\") String apiKey) {\n    if (LEAKED_API_KEY.equals(apiKey)) {\n      return success(this)\n          .feedback(\"securitymisconfiguration.task3.success\")\n          .output(\"Actuator endpoints now require authentication and are limited to ops network.\")\n          .build();\n    }\n    if (apiKey == null || apiKey.isBlank()) {\n      return failed(this)\n          .feedback(\"securitymisconfiguration.task3.failure.blank\")\n          .build();\n    }\n    return failed(this)\n        .feedback(\"securitymisconfiguration.task3.failure.invalid\")\n        .build();\n  }\n}\n",
+  "raw_response": "{\n  \"relevance\": \"HIGH\",\n  \"insights\": [\n    {\n      \"finding\": \"Exposed Spring Actuator Endpoints with Sensitive Configuration Information\",\n      \"impact\": \"HIGH\",\n      \"confidence\": \"HIGH\", \n      \"effort\": \"MEDIUM\",\n      \"line_number\": 21,\n      \"cwe\": \"CWE-200\",\n      \"recommendation\": \"Disable or restrict access to actuator endpoints in non-production environments. Implement authentication, authorization, and limit endpoint exposure to only necessary information. Use Spring Security to configure endpoint access and remove sensitive data from responses.\"\n    },\n    {\n      \"finding\": \"Hardcoded API Key in Source Code\",\n      \"impact\": \"CRITICAL\", \n      \"confidence\": \"HIGH\",\n      \"effort\": \"LOW\",\n      \"line_number\": 15,\n      \"cwe\": \"CWE-798\",\n      \"recommendation\": \"Remove hardcoded credentials. Use secure external configuration management like environment variables, secure vaults, or configuration servers. Implement credential rotation and avoid storing secrets directly in source code.\"\n    },\n    {\n      \"finding\": \"Detailed System Environment Exposure\",\n      \"impact\": \"HIGH\",\n      \"confidence\": \"HIGH\", \n      \"effort\": \"MEDIUM\",\n      \"line_number\": 21,\n      \"cwe\": \"CWE-538\",\n      \"recommendation\": \"Implement granular control over actuator endpoint information. Sanitize and minimize the exposed configuration details. Ensure no sensitive system information is revealed in health or environment endpoint responses.\"\n    }\n  ]\n}",
+  "parsed": {
+    "relevance": "HIGH",
+    "insights": [
+      {
+        "finding": "Exposed Spring Actuator Endpoints with Sensitive Configuration Information",
+        "impact": "HIGH",
+        "confidence": "HIGH",
+        "effort": "MEDIUM",
+        "line_number": 21,
+        "cwe": "CWE-200",
+        "recommendation": "Disable or restrict access to actuator endpoints in non-production environments. Implement authentication, authorization, and limit endpoint exposure to only necessary information. Use Spring Security to configure endpoint access and remove sensitive data from responses."
+      },
+      {
+        "finding": "Hardcoded API Key in Source Code",
+        "impact": "CRITICAL",
+        "confidence": "HIGH",
+        "effort": "LOW",
+        "line_number": 15,
+        "cwe": "CWE-798",
+        "recommendation": "Remove hardcoded credentials. Use secure external configuration management like environment variables, secure vaults, or configuration servers. Implement credential rotation and avoid storing secrets directly in source code."
+      },
+      {
+        "finding": "Detailed System Environment Exposure",
+        "impact": "HIGH",
+        "confidence": "HIGH",
+        "effort": "MEDIUM",
+        "line_number": 21,
+        "cwe": "CWE-538",
+        "recommendation": "Implement granular control over actuator endpoint information. Sanitize and minimize the exposed configuration details. Ensure no sensitive system information is revealed in health or environment endpoint responses."
+      }
+    ]
+  },
+  "timestamp": "2025-10-31T03:52:05.740311+00:00"
+}

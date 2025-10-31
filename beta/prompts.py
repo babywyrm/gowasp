@@ -194,3 +194,38 @@ Provide your response in a single, clean JSON object with the following structur
     "explanation": "A brief explanation of how this payload helps test the defensive measure."
   }}
 }}"""
+
+    @staticmethod
+    def code_improvement(file_path: Path, content: str, focus_areas: List[str]) -> str:
+        """Generate suggestions to improve Python code quality."""
+        focus_str = ", ".join(focus_areas) if focus_areas else "all aspects"
+        
+        return f"""You are a Python code quality expert. Analyze the following code and provide specific, actionable improvements focusing on: {focus_str}.
+
+FILE: {file_path}
+
+Your analysis should cover:
+1. **Type Hints**: Add/improve type annotations (PEP 484)
+2. **Readability**: Simplify complex logic, improve naming, reduce nesting
+3. **Security**: Identify unsafe patterns (eval, exec, shell injection risks, etc.)
+4. **Performance**: Suggest more efficient approaches
+5. **Pythonic Code**: Use standard library better, follow PEP 8
+
+Provide your response in this exact JSON format. Respond ONLY with the JSON object.
+{{
+  "overall_quality": "EXCELLENT|GOOD|FAIR|NEEDS_IMPROVEMENT",
+  "improvements": [
+    {{
+      "category": "typing|readability|security|performance|pythonic",
+      "line_number": 42,
+      "current_code": "The problematic code snippet",
+      "improved_code": "The improved version",
+      "explanation": "Why this is better",
+      "impact": "HIGH|MEDIUM|LOW"
+    }}
+  ],
+  "summary": "Brief overall assessment and key recommendations"
+}}
+
+CODE TO ANALYZE:
+{content}"""

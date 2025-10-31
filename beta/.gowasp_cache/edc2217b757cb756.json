@@ -1,0 +1,27 @@
+{
+  "stage": "prioritization",
+  "file": null,
+  "prompt": "You are a lead software architect. Your task is to identify the most critical files to analyze to answer the user's question.\n\nUser Question: \"lets analyze and optomize this team\"\n\nFile List:\n[\n  \"dynamic__.py\",\n  \"dynamic_max_.py\",\n  \"prompts.py\",\n  \"smart__.py\"\n]\n\nReturn a JSON object with a single key \"prioritized_files\". This key should contain a list of objects, where each object has a \"file_name\" and a \"reason\" explaining its relevance. Limit the list to the top 15 most relevant files. Your response must contain ONLY the JSON object.\nExample:\n{\n  \"prioritized_files\": [\n    {\n      \"file_name\": \"UserService.java\",\n      \"reason\": \"This file likely handles user creation and authentication, which is central to the user's security question.\"\n    },\n    {\n      \"file_name\": \"JwtUtil.java\",\n      \"reason\": \"This file probably manages JWT token generation and validation, a critical component of authorization.\"\n    }\n  ]\n}",
+  "raw_response": "{\n  \"prioritized_files\": [\n    {\n      \"file_name\": \"dynamic__.py\",\n      \"reason\": \"Appears to be a core dynamic processing file that may provide insights into team workflow and optimization\"\n    },\n    {\n      \"file_name\": \"dynamic_max_.py\", \n      \"reason\": \"Likely an extension or advanced version of the dynamic processing, potentially revealing optimization strategies\"\n    },\n    {\n      \"file_name\": \"smart__.py\",\n      \"reason\": \"Suggests intelligent or adaptive functionality that could be relevant to team performance optimization\"\n    },\n    {\n      \"file_name\": \"prompts.py\",\n      \"reason\": \"May contain configuration or communication patterns that could inform team optimization approaches\"\n    }\n  ]\n}",
+  "parsed": {
+    "prioritized_files": [
+      {
+        "file_name": "dynamic__.py",
+        "reason": "Appears to be a core dynamic processing file that may provide insights into team workflow and optimization"
+      },
+      {
+        "file_name": "dynamic_max_.py",
+        "reason": "Likely an extension or advanced version of the dynamic processing, potentially revealing optimization strategies"
+      },
+      {
+        "file_name": "smart__.py",
+        "reason": "Suggests intelligent or adaptive functionality that could be relevant to team performance optimization"
+      },
+      {
+        "file_name": "prompts.py",
+        "reason": "May contain configuration or communication patterns that could inform team optimization approaches"
+      }
+    ]
+  },
+  "timestamp": "2025-10-31T03:57:08.679288+00:00"
+}

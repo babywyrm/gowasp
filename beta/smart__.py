@@ -7,6 +7,7 @@ Stages:
   2. Deep Dive
   3. Synthesis
   4. (Optional) Annotation & Payload Generation
+  5. (Optional with --optimize) Code Quality Improvement
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ from prompts import PromptFactory
 
 
 # ---------- Constants ----------
-CLAUDE_MODEL: Final = "claude-3-5-sonnet-20241022"
+CLAUDE_MODEL: Final = "claude-3-5-haiku-20241022"
 DEFAULT_MAX_FILE_BYTES: Final = 500_000
 DEFAULT_MAX_FILES: Final = 400
 SKIP_DIRS: Final = {".git", "node_modules", "__pycache__", "vendor", "build", "dist"}
@@ -403,6 +404,72 @@ class SmartAnalyzer:
                 )
             time.sleep(1)
 
+    def run_code_improvement_stage(
+        self, files: List[Path], focus_areas: List[str], debug: bool
+    ) -> Dict[str, List[dict]]:
+        """Analyze Python files for code quality improvements (ONLY when --optimize flag is used)."""
+        self.console.print("\n[bold cyan]Stage: Code Quality Optimization[/bold cyan]")
+        improvements_by_file: Dict[str, List[dict]] = {}
+        
+        python_files = [f for f in files if f.suffix == ".py"]
+        if not python_files:
+            self.console.print("[yellow]No Python files found to optimize.[/yellow]")
+            return improvements_by_file
+        
+        for i, file_path in enumerate(python_files, 1):
+            self.console.print(
+                f"[[bold]{i}/{len(python_files)}[/bold]] Optimizing {file_path.name}..."
+            )
+            try:
+                content = file_path.read_text(encoding="utf-8", errors="replace")
+            except OSError as e:
+                self.console.print(f"  [red]Error reading {file_path}: {e}[/red]")
+                continue
+            
+            prompt = PromptFactory.code_improvement(
+                file_path, content, focus_areas
+            )
+            raw = self._call_claude(
+                "code_improvement", str(file_path), prompt, max_tokens=6000
+            )
+            
+            if not raw:
+                continue
+                
+            if debug:
+                self.console.print(
+                    Panel(raw, title=f"RAW API RESPONSE ({file_path.name})")
+                )
+            
+            parsed = parse_json_response(raw)
+            if parsed and isinstance(parsed.get("improvements"), list):
+                quality = parsed.get("overall_quality", "N/A")
+                improvements = parsed["improvements"]
+                improvements_by_file[str(file_path)] = improvements
+                
+                self.console.print(
+                    f"   Quality: [{'green' if quality == 'EXCELLENT' else 'yellow'}]{quality}[/], "
+                    f"Improvements: {len(improvements)}"
+                )
+                
+                # Display high-impact improvements
+                high_impact = [
+                    imp for imp in improvements if imp.get("impact") == "HIGH"
+                ]
+                if high_impact:
+                    self.console.print(
+                        f"   [bold red]⚠ {len(high_impact)} HIGH impact "
+                        f"improvement(s) found[/bold red]"
+                    )
+            
+            time.sleep(1)
+        
+        self.console.print(
+            f"\n[green]✓ Code optimization complete. "
+            f"Analyzed {len(python_files)} Python files.[/green]"
+        )
+        return improvements_by_file
+
 
 # ---------- Output ----------
 class OutputManager:
@@ -430,6 +497,76 @@ class OutputManager:
                 panel_title = f"[cyan]{Path(finding.file_path).name}[/cyan] - [yellow]{finding.finding}[/yellow] ({finding.cwe})"
                 self.console.print(Panel(syntax, title=panel_title, border_style="magenta"))
 
+    def display_code_improvements(
+        self, improvements_by_file: Dict[str, List[dict]]
+    ) -> None:
+        """Display code improvement suggestions in a readable format."""
+        if not improvements_by_file:
+            return
+        
+        self.console.print(
+            "\n[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]"
+        )
+        self.console.print(
+            "[bold cyan]Code Quality Optimization Results[/bold cyan]"
+        )
+        self.console.print(
+            "[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]\n"
+        )
+        
+        for file_path, improvements in improvements_by_file.items():
+            if not improvements:
+                continue
+            
+            file_name = Path(file_path).name
+            self.console.print(f"\n[cyan]━━━ {file_name} ━━━[/cyan]")
+            
+            for imp in improvements:
+                category = imp.get("category", "general")
+                line = imp.get("line_number", "?")
+                impact = imp.get("impact", "?")
+                
+                # Color based on category
+                color_map = {
+                    "security": "red",
+                    "performance": "yellow",
+                    "typing": "blue",
+                    "readability": "green",
+                    "pythonic": "magenta"
+                }
+                color = color_map.get(category, "white")
+                
+                self.console.print(
+                    f"\n[{color}]● {category.upper()}[/{color}] "
+                    f"(Line {line}, Impact: {impact})"
+                )
+                self.console.print(f"  [dim]{imp.get('explanation', '')}[/dim]")
+                
+                # Show before/after if available
+                if imp.get("current_code"):
+                    self.console.print("\n  [red]Before:[/red]")
+                    self.console.print(
+                        Syntax(
+                            imp["current_code"],
+                            "python",
+                            theme="monokai",
+                            line_numbers=False,
+                            indent_guides=False
+                        )
+                    )
+                
+                if imp.get("improved_code"):
+                    self.console.print("  [green]After:[/green]")
+                    self.console.print(
+                        Syntax(
+                            imp["improved_code"],
+                            "python",
+                            theme="monokai",
+                            line_numbers=False,
+                            indent_guides=False
+                        )
+                    )
+
     def save_reports(
         self, report: AnalysisReport, formats: List[str], output_base: Optional[str]
     ) -> None:
@@ -455,6 +592,42 @@ class OutputManager:
                 self.console.print(f"[green]✓ Saved report to {out}[/green]")
             except Exception as e:
                 self.console.print(f"[red]Error saving {fmt} report: {e}[/red]")
+
+    def save_improvement_report(
+        self, improvements: Dict[str, List[dict]], output_path: Path
+    ) -> None:
+        """Save code improvements to a structured markdown file."""
+        if not improvements:
+            return
+        
+        try:
+            # Markdown format
+            content = ["# Code Quality Optimization Report\n"]
+            content.append(
+                f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
+            )
+            
+            for file_path, imps in improvements.items():
+                file_name = Path(file_path).name
+                content.append(f"\n## {file_name}\n")
+                for imp in imps:
+                    content.append(
+                        f"### Line {imp.get('line_number', '?')}: "
+                        f"{imp.get('category', 'general').title()}\n"
+                    )
+                    content.append(f"**Impact**: {imp.get('impact', 'N/A')}\n\n")
+                    content.append(f"{imp.get('explanation', '')}\n\n")
+                    if imp.get("improved_code"):
+                        content.append("```python\n")
+                        content.append(imp["improved_code"])
+                        content.append("\n```\n\n")
+            
+            output_path.write_text("".join(content), encoding="utf-8")
+            self.console.print(
+                f"[green]✓ Saved optimization report to {output_path}[/green]"
+            )
+        except Exception as e:
+            self.console.print(f"[red]Error saving optimization report: {e}[/red]")
 
 
 # ---------- Interactivity ----------
@@ -515,6 +688,20 @@ def create_parser() -> argparse.ArgumentParser:
         "-v", "--verbose", action="store_true", help="Print findings inline with code context"
     )
     p.add_argument("--debug", action="store_true", help="Print raw API responses")
+    
+    # NEW: Code optimization flags
+    p.add_argument(
+        "--optimize",
+        action="store_true",
+        help="Run code quality optimization analysis on Python files"
+    )
+    p.add_argument(
+        "--focus",
+        nargs="*",
+        choices=["typing", "readability", "security", "performance", "pythonic"],
+        help="Focus areas for code optimization (default: all). Only used with --optimize"
+    )
+    
     return p
 
 
@@ -598,8 +785,7 @@ def main() -> None:
         synthesis=synthesis,
     )
 
-    # --- NEW LOGIC TO CURATE TOP FINDINGS FOR ACTIONS ---
-    # This ensures we get one finding per file for a diverse report.
+    # Curate top findings for actions
     top_findings_for_action = []
     processed_files = set()
     if findings:
@@ -623,6 +809,23 @@ def main() -> None:
 
     if args.generate_payloads and top_findings_for_action:
         analyzer.run_payload_generation_stage(top_findings_for_action, args.debug)
+
+    # NEW: Code optimization stage (ONLY runs if --optimize flag is set)
+    improvements = {}
+    if args.optimize:
+        focus_areas = args.focus or []
+        improvements = analyzer.run_code_improvement_stage(
+            files_to_analyze, focus_areas, args.debug
+        )
+        
+        # Display improvements in console
+        if improvements:
+            out.display_code_improvements(improvements)
+            
+            # Save improvements to file if requested
+            if args.output:
+                improvement_output = Path(args.output).with_suffix(".optimization.md")
+                out.save_improvement_report(improvements, improvement_output)
 
     if args.save_conversations:
         cache.save_session_log()
