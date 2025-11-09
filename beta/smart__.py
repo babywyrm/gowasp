@@ -33,6 +33,11 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
+# Add beta directory to path for imports
+_BETA_DIR = Path(__file__).parent
+if str(_BETA_DIR) not in sys.path:
+    sys.path.insert(0, str(_BETA_DIR))
+
 from prompts import PromptFactory
 
 

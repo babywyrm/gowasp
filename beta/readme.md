@@ -3,9 +3,9 @@
 
 ![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Powered by](https://img.shields.io/badge/Powered%20by-Claude%203.5%20Sonnet-orange.svg)
+![Powered by](https://img.shields.io/badge/Powered%20by-Claude%203.5%20Haiku-orange.svg)
 
-An AI-powered, multi-stage script for deep, contextual analysis of codebases using the Anthropic Claude 3.5 Sonnet API.
+An AI-powered, multi-stage script for deep, contextual analysis of codebases using the Anthropic Claude 3.5 Haiku API (cost-effective for batch analysis).
 This tool goes beyond simple file-by-file scanning to provide **holistic, synthesized insights** and **optional testing payloads** for both Red and Blue teams.
 
 ---
