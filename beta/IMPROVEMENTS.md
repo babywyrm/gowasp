@@ -137,5 +137,5 @@ rich>=13.0.0
 
 - Consider creating a unified CLI entry point that lets users choose analyzer mode
 - Evaluate if `rc1/` scripts should be deprecated in favor of `smart__.py`
-- Consider integration with main `gowasp` project for hybrid analysis
+- Consider integration with main project for hybrid analysis
 

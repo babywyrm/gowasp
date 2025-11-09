@@ -60,7 +60,7 @@ If the directory structure matches exactly, it will detect and offer to resume t
 
 ### Review State Files
 
-Reviews are stored in `.gowasp_cache/reviews/`:
+Reviews are stored in `.scrynet_cache/reviews/`:
 
 - `{review_id}.json` - Structured review state (machine-readable)
 - `_{review_id}_context.md` - Human-readable context for Cursor/Claude
@@ -89,6 +89,10 @@ This feature is **completely optional**:
 - Existing workflow unchanged if you don't use the flags
 - No impact on performance when disabled
 - All review state is stored in cache directory (already gitignored)
+
+## Scrynet
+
+Scrynet is the AI-powered code analysis system that powers this review state management. The name reflects its ability to "scry" (see into) code to reveal security issues and insights.
 
 ## Example Workflow
 

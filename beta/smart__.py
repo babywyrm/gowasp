@@ -871,7 +871,7 @@ def create_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Smart Code Analyzer with caching + full features")
     p.add_argument("repo_path", help="Path to the repository to analyze")
     p.add_argument("question", nargs="?", help="Analysis question")
-    p.add_argument("--cache-dir", default=".gowasp_cache", help="Directory for conversation cache")
+    p.add_argument("--cache-dir", default=".scrynet_cache", help="Directory for conversation cache")
     p.add_argument("--no-cache", action="store_true", help="Disable cache (always hit API)")
     p.add_argument(
         "--save-conversations", action="store_true", help="Save full session log as JSON"
@@ -1218,7 +1218,7 @@ def main() -> None:
     if review_state:
         review_manager.mark_completed(review_state.review_id)
         console.print(f"\n[green]✓ Review state saved: {review_state.review_id}[/green]")
-        console.print(f"[dim]Context file: .gowasp_cache/reviews/_{review_state.review_id}_context.md[/dim]")
+        console.print(f"[dim]Context file: .scrynet_cache/reviews/_{review_state.review_id}_context.md[/dim]")
 
 
 if __name__ == "__main__":
