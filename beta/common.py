@@ -7,6 +7,7 @@ Reduces code duplication and provides consistent behavior.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import sys
@@ -25,19 +26,31 @@ _CODE_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
 
 def get_api_key() -> str:
     """Retrieves the Claude API key from environment variable."""
-    api_key = os.getenv("CLAUDE_API_KEY")
-    if not api_key:
-        print("Error: CLAUDE_API_KEY environment variable not set.", file=sys.stderr)
+    try:
+        api_key = os.environ["CLAUDE_API_KEY"]
+    except KeyError:
+        logging.error("CLAUDE_API_KEY environment variable must be set")
         sys.exit(1)
     return api_key
 
 
-def parse_json_response(response_text: str) -> Optional[dict]:
+def parse_json_response(response_text: str, max_size: int = 1_000_000) -> Optional[dict]:
     """
     Safely parses a JSON object from API response text.
     Handles code fences and extracts JSON from unstructured text.
+    
+    Args:
+        response_text: Raw API response text
+        max_size: Maximum response size in bytes to prevent memory exhaustion
+    
+    Returns:
+        Parsed JSON dict or None if parsing fails
     """
     if not response_text:
+        return None
+    
+    if len(response_text) > max_size:
+        logging.warning(f"Response too large: {len(response_text)} bytes, max {max_size}")
         return None
     
     # Remove markdown code fences if present
@@ -112,16 +125,19 @@ def scan_repo_files(
         if file_path.suffix.lower() not in allowed_exts:
             continue
         
-        # Check file size
+        # Check file size with proper error handling
         try:
-            if file_path.stat().st_size > max_file_bytes:
+            file_stat = file_path.stat()
+            if file_stat.st_size > max_file_bytes:
                 continue
-        except OSError:
+        except (OSError, PermissionError):
             continue
         
-        results.append(file_path)
+        # Use resolved paths for canonical representation
+        results.append(file_path.resolve())
     
-    return sorted(results, key=lambda p: (p.suffix, p.name.lower()))
+    # Sort by extension and full path for consistent ordering
+    return sorted(results, key=lambda p: (p.suffix, str(p).lower()))
 
 
 def validate_repo_path(path: str | Path) -> Path:

@@ -15,7 +15,7 @@ import re
 from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Any, Dict, List, Optional
 from enum import Enum
 
 import anthropic
@@ -186,8 +186,9 @@ class SmartCodeAnalyzer:
         
     def initialize_client(self) -> None:
         """Initializes the Anthropic client, ensuring the API key is set."""
-        api_key = os.getenv('CLAUDE_API_KEY')
-        if not api_key:
+        try:
+            api_key = os.environ['CLAUDE_API_KEY']
+        except KeyError:
             self.console.print("[bold red]Error: CLAUDE_API_KEY environment variable not set.[/bold red]")
             sys.exit(1)
         self.client = anthropic.Anthropic(api_key=api_key)
@@ -244,7 +245,7 @@ class SmartCodeAnalyzer:
         batch_content, file_summaries = [], []
         for fp in file_batch:
             try:
-                content = fp.read_text(encoding='utf-8', errors='replace').strip()
+                content = fp.read_text(encoding='utf-8', errors='ignore', newline=None).strip()
                 if content:
                     batch_content.append(f"\n=== FILE: {fp} ===\n{content}")
                     file_summaries.append(f"- {fp.name} ({len(content)} chars)")
@@ -253,7 +254,7 @@ class SmartCodeAnalyzer:
         return f"""You are an expert code analyst. Analyze this batch of related files together to understand their relationships and answer the specific question.
 ANALYSIS QUESTION: {question}
 FILES IN THIS BATCH:
-{chr(10).join(file_summaries)}
+{os.linesep.join(file_summaries)}
 CONTEXT: These files are grouped together. Look for cross-file dependencies, shared patterns, and how they collectively address the question.
 PROVIDE OUTPUT IN JSON FORMAT:
 {{
@@ -274,7 +275,7 @@ BATCH CODE TO ANALYZE:
 Focus on findings that directly relate to: "{question}"
 Be specific about cross-file relationships and systemic patterns."""
     
-    def _parse_json_response(self, response_text: str) -> Optional[Dict]:
+    def _parse_json_response(self, response_text: str) -> Optional[Dict[str, Any]]:
         """Safely extracts and parses a JSON object from the API's text response."""
         try:
             match = re.search(r'\{.*\}', response_text, re.DOTALL)

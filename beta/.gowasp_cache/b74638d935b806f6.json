@@ -1,0 +1,47 @@
+{
+  "stage": "prioritization",
+  "file": null,
+  "prompt": "You are a lead software architect. Your task is to identify the most critical files to analyze to answer the user's question.\n\nUser Question: \"find all security vulnerabilities and suggest remediations\"\n\nFile List:\n[\n  \"CurrentUser.java\",\n  \"FileServer.java\",\n  \"HammerHead.java\",\n  \"MvcConfiguration.java\",\n  \"MvcConfiguration.java\",\n  \"ParentConfig.java\",\n  \"StartWebGoat.java\",\n  \"WebSecurityConfig.java\",\n  \"WebSecurityConfig.java\",\n  \"WebWolf.java\",\n  \"WebWolfRedirect.java\"\n]\n\nReturn a JSON object with a single key \"prioritized_files\". This key should contain a list of objects, where each object has a \"file_name\" and a \"reason\" explaining its relevance. Limit the list to the top 15 most relevant files. Your response must contain ONLY the JSON object.\nExample:\n{\n  \"prioritized_files\": [\n    {\n      \"file_name\": \"UserService.java\",\n      \"reason\": \"This file likely handles user creation and authentication, which is central to the user's security question.\"\n    },\n    {\n      \"file_name\": \"JwtUtil.java\",\n      \"reason\": \"This file probably manages JWT token generation and validation, a critical component of authorization.\"\n    }\n  ]\n}",
+  "raw_response": "{\n  \"prioritized_files\": [\n    {\n      \"file_name\": \"WebSecurityConfig.java\",\n      \"reason\": \"Primary configuration for web security, likely contains authentication, authorization, and security filter configurations\"\n    },\n    {\n      \"file_name\": \"CurrentUser.java\",\n      \"reason\": \"Potentially handles user authentication and access control mechanisms\"\n    },\n    {\n      \"file_name\": \"MvcConfiguration.java\", \n      \"reason\": \"May contain configuration for web request handling and potential security interceptors\"\n    },\n    {\n      \"file_name\": \"ParentConfig.java\",\n      \"reason\": \"Could contain base security or application configuration that impacts overall security posture\"\n    },\n    {\n      \"file_name\": \"StartWebGoat.java\",\n      \"reason\": \"Application startup class that might reveal initial security setup\"\n    },\n    {\n      \"file_name\": \"FileServer.java\",\n      \"reason\": \"Potential security risks related to file handling and access controls\"\n    },\n    {\n      \"file_name\": \"WebWolf.java\",\n      \"reason\": \"Additional web-related configuration that might impact security settings\"\n    },\n    {\n      \"file_name\": \"WebWolfRedirect.java\",\n      \"reason\": \"Redirect handling that could potentially have security implications\"\n    },\n    {\n      \"file_name\": \"HammerHead.java\",\n      \"reason\": \"Might be related to request handling or processing with potential security considerations\"\n    }\n  ]\n}",
+  "parsed": {
+    "prioritized_files": [
+      {
+        "file_name": "WebSecurityConfig.java",
+        "reason": "Primary configuration for web security, likely contains authentication, authorization, and security filter configurations"
+      },
+      {
+        "file_name": "CurrentUser.java",
+        "reason": "Potentially handles user authentication and access control mechanisms"
+      },
+      {
+        "file_name": "MvcConfiguration.java",
+        "reason": "May contain configuration for web request handling and potential security interceptors"
+      },
+      {
+        "file_name": "ParentConfig.java",
+        "reason": "Could contain base security or application configuration that impacts overall security posture"
+      },
+      {
+        "file_name": "StartWebGoat.java",
+        "reason": "Application startup class that might reveal initial security setup"
+      },
+      {
+        "file_name": "FileServer.java",
+        "reason": "Potential security risks related to file handling and access controls"
+      },
+      {
+        "file_name": "WebWolf.java",
+        "reason": "Additional web-related configuration that might impact security settings"
+      },
+      {
+        "file_name": "WebWolfRedirect.java",
+        "reason": "Redirect handling that could potentially have security implications"
+      },
+      {
+        "file_name": "HammerHead.java",
+        "reason": "Might be related to request handling or processing with potential security considerations"
+      }
+    ]
+  },
+  "timestamp": "2025-11-09T19:28:39.228240+00:00"
+}

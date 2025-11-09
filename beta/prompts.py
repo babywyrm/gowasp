@@ -7,8 +7,9 @@ Keeping prompts separate makes the core pipeline lighter and easier to maintain.
 
 from __future__ import annotations
 import json as _json
+import os
 from pathlib import Path
-from typing import List, Any
+from typing import Any, Dict, List
 
 
 class PromptFactory:
@@ -124,7 +125,12 @@ HELM TEMPLATE TO ANALYZE:
     
     @staticmethod
     def annotation(finding: Any, code_content: str) -> str:
-        """Generates a focused, annotated code snippet for a specific finding."""
+        """Generates a focused, annotated code snippet for a specific finding.
+        
+        Args:
+            finding: Finding dataclass instance with file_path, line_number, finding, recommendation attributes
+            code_content: Full content of the file containing the finding
+        """
         return f"""You are a secure coding expert providing feedback in a code review. Your task is to create an annotated code snippet for a specific security finding.
 
 SECURITY FINDING:
@@ -151,7 +157,10 @@ Example format:
     def synthesis(all_findings: list, question: str) -> str:
         """Generate the executive summary based on findings and question."""
         from pathlib import Path as _Path
-        condensed_findings = [f"- {f.finding} (in {_Path(f.file_path).name})" for f in all_findings]
+        condensed_findings = [
+            f"- {finding.finding} (in {_Path(finding.file_path).name})" 
+            for finding in all_findings
+        ]
         
         synthesis_goal = """Your report must be in Markdown and contain the following three sections EXACTLY:
 
@@ -167,7 +176,7 @@ Example format:
 Original Question: "{question}"
 
 Raw Findings:
-{chr(10).join(condensed_findings)}"""
+{os.linesep.join(condensed_findings)}"""
 
     @staticmethod
     def payload_generation(finding: Any, code_snippet: str) -> str:

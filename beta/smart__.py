@@ -24,7 +24,7 @@ import time
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Final, List, Optional, Sequence
+from typing import Any, Dict, Final, List, Optional, Sequence, Union
 
 import anthropic
 from rich.console import Console
@@ -165,9 +165,15 @@ def get_api_key() -> str:
 _CODE_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
 
 
-def parse_json_response(response_text: str) -> Optional[dict]:
+def parse_json_response(response_text: str, max_size: int = 1_000_000) -> Optional[dict]:
+    """Parse JSON from API response with size limit to prevent memory exhaustion."""
     if not response_text:
         return None
+    
+    if len(response_text) > max_size:
+        print(f"Response too large: {len(response_text)} bytes", file=sys.stderr)
+        return None
+    
     cleaned = _CODE_FENCE_RE.sub("", response_text).strip()
     start, end = cleaned.find("{"), cleaned.rfind("}")
     if start != -1 and end != -1 and end > start:
@@ -179,11 +185,11 @@ def parse_json_response(response_text: str) -> Optional[dict]:
 
 
 def scan_repo_files(
-    repo_path: str,
-    include_yaml: bool,
-    include_helm: bool,
-    max_file_bytes: int,
-    max_files: int,
+    repo_path: Union[str, Path],
+    include_yaml: bool = False,
+    include_helm: bool = False,
+    max_file_bytes: int = DEFAULT_MAX_FILE_BYTES,
+    max_files: int = DEFAULT_MAX_FILES,
 ) -> List[Path]:
     repo = Path(repo_path)
     if not repo.is_dir():
@@ -204,9 +210,10 @@ def scan_repo_files(
         if file_path.suffix.lower() not in allowed_exts:
             continue
         try:
-            if file_path.stat().st_size > max_file_bytes:
+            file_stat = file_path.stat()
+            if file_stat.st_size > max_file_bytes:
                 continue
-        except OSError:
+        except (OSError, PermissionError):
             continue
         results.append(file_path)
     return sorted(results, key=lambda p: (p.suffix, p.name.lower()))
@@ -222,6 +229,11 @@ class SmartAnalyzer:
     def _call_claude(
         self, stage: str, file: Optional[str], prompt: str, max_tokens: int = 4000
     ) -> Optional[str]:
+        # Input validation to prevent memory exhaustion
+        if not prompt or len(prompt) > 100_000:
+            self.console.print(f"[red]Invalid prompt length: {len(prompt)} bytes (max 100,000)[/red]")
+            return None
+        
         cached = self.cache.get(stage, file, prompt)
         if cached:
             self.console.print(f"[dim]Cache hit for {stage} ({file or 'n/a'})[/dim]")
@@ -606,9 +618,9 @@ class OutputManager:
             self.console.print(f"\n[cyan]━━━ {file_name} ━━━[/cyan]")
             
             for imp in improvements:
-                category = imp.get("category", "general")
-                line = imp.get("line_number", "?")
-                impact = imp.get("impact", "?")
+                category = str(imp.get("category", "general")).lower()
+                line = str(imp.get("line_number", "?"))
+                impact = str(imp.get("impact", "?")).upper()
                 
                 # Color based on category
                 color_map = {

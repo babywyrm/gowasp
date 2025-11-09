@@ -15,7 +15,7 @@ import time
 import argparse
 from pathlib import Path
 from collections import Counter
-from typing import List, Dict, Optional
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -107,9 +107,11 @@ CODE TO ANALYZE:
 def analyze_file_with_claude(client: anthropic.Anthropic, file_path: Path, question: str, console: Console) -> Optional[str]:
     """Analyzes a single file using the Claude API."""
     try:
-        content = file_path.read_text(encoding='utf-8', errors='replace')
-        if not content.strip() or len(content) > 100000:
+        content = file_path.read_text(encoding='utf-8', errors='ignore')
+        # Explicitly limit file size to prevent memory issues
+        if not content.strip() or len(content) > 50000:
             return None
+        content = content[:50000]  # Limit file size explicitly
         
         console.print(f"   [dim]File size: {len(content)} characters[/dim]")
         prompt = get_dynamic_prompt(file_path, content, question)
@@ -117,14 +119,15 @@ def analyze_file_with_claude(client: anthropic.Anthropic, file_path: Path, quest
         response = client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=4000,
-            messages=[{"role": "user", "content": prompt}]
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0
         )
         return response.content[0].text
     except Exception as e:
         console.print(f"   [red]Error analyzing {file_path.name}: {e}[/red]")
         return None
 
-def parse_json_response(response_text: str) -> Optional[Dict]:
+def parse_json_response(response_text: str) -> Optional[Dict[str, Any]]:
     """Safely parses a JSON object from the API's potentially unstructured text response."""
     try:
         start = response_text.find('{')
