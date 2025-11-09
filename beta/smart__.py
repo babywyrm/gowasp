@@ -40,6 +40,13 @@ if str(_BETA_DIR) not in sys.path:
 
 from prompts import PromptFactory
 
+# Optional review state management (only imported if needed)
+try:
+    from review_state import ReviewStateManager
+    REVIEW_STATE_AVAILABLE = True
+except ImportError:
+    REVIEW_STATE_AVAILABLE = False
+
 
 # ---------- Constants ----------
 CLAUDE_MODEL: Final = "claude-3-5-haiku-20241022"
@@ -919,12 +926,89 @@ def create_parser() -> argparse.ArgumentParser:
         help="Show unified diff of changes when writing optimized files (requires --optimize-output)"
     )
     
+    # Review state management flags (optional, non-breaking)
+    if REVIEW_STATE_AVAILABLE:
+        p.add_argument(
+            "--enable-review-state",
+            action="store_true",
+            help="Enable review state tracking for resuming reviews"
+        )
+        p.add_argument(
+            "--resume-review",
+            metavar="REVIEW_ID",
+            help="Resume an existing review by review ID"
+        )
+        p.add_argument(
+            "--list-reviews",
+            action="store_true",
+            help="List all available reviews and exit"
+        )
+        p.add_argument(
+            "--review-status",
+            metavar="REVIEW_ID",
+            help="Show status of a specific review and exit"
+        )
+    
     return p
 
 
 def main() -> None:
     args = create_parser().parse_args()
     console = Console()
+
+    # Handle review state management commands (if available)
+    if REVIEW_STATE_AVAILABLE:
+        review_manager = ReviewStateManager(args.cache_dir)
+        
+        if args.list_reviews:
+            reviews = review_manager.list_reviews()
+            if not reviews:
+                console.print("[yellow]No reviews found.[/yellow]")
+                return
+            
+            table = Table(title="Available Reviews")
+            table.add_column("Review ID", style="cyan")
+            table.add_column("Repository", style="magenta")
+            table.add_column("Question", style="green")
+            table.add_column("Status", style="yellow")
+            table.add_column("Updated", style="dim")
+            
+            for review in reviews[:20]:  # Limit to 20 most recent
+                table.add_row(
+                    review.review_id,
+                    Path(review.repo_path).name,
+                    review.question[:50] + "..." if len(review.question) > 50 else review.question,
+                    review.status,
+                    review.updated_at[:10]  # Just date
+                )
+            console.print(table)
+            if len(reviews) > 20:
+                console.print(f"\n[dim]... and {len(reviews) - 20} more reviews[/dim]")
+            return
+        
+        if args.review_status:
+            try:
+                review = review_manager.load_review(args.review_status)
+                console.print(Panel(
+                    f"[bold]Review ID:[/bold] {review.review_id}\n"
+                    f"[bold]Repository:[/bold] {review.repo_path}\n"
+                    f"[bold]Question:[/bold] {review.question}\n"
+                    f"[bold]Status:[/bold] {review.status}\n"
+                    f"[bold]Created:[/bold] {review.created_at}\n"
+                    f"[bold]Updated:[/bold] {review.updated_at}\n"
+                    f"[bold]Files Analyzed:[/bold] {len(review.files_analyzed)}\n"
+                    f"[bold]Findings:[/bold] {len(review.findings)}\n"
+                    f"[bold]Checkpoints:[/bold] {len(review.checkpoints)}",
+                    title="Review Status",
+                    border_style="blue"
+                ))
+                if review.checkpoints:
+                    console.print("\n[bold]Checkpoints:[/bold]")
+                    for cp in review.checkpoints:
+                        console.print(f"  - {cp.stage} ({cp.timestamp[:19]})")
+            except FileNotFoundError:
+                console.print(f"[red]Review '{args.review_status}' not found.[/red]")
+            return
 
     api_key = get_api_key()
     client = anthropic.Anthropic(api_key=api_key)
@@ -943,6 +1027,40 @@ def main() -> None:
 
     question = clarify_question_interactively(question, console)
 
+    # Initialize review state management (if enabled)
+    review_state = None
+    if REVIEW_STATE_AVAILABLE and (args.enable_review_state or args.resume_review):
+        review_manager = ReviewStateManager(args.cache_dir)
+        
+        if args.resume_review:
+            try:
+                review_state = review_manager.load_review(args.resume_review)
+                console.print(f"[green]✓ Resuming review: {review_state.review_id}[/green]")
+                console.print(f"[dim]Previous question: {review_state.question}[/dim]")
+                # Optionally use previous question if not provided
+                if not args.question:
+                    use_previous = input("Use previous question? [Y/n]: ").strip().lower()
+                    if use_previous in ("", "y", "yes"):
+                        question = review_state.question
+            except FileNotFoundError:
+                console.print(f"[yellow]Review '{args.resume_review}' not found. Starting new review.[/yellow]")
+                review_state = review_manager.create_review(str(repo_path), question)
+        else:
+            # Check for matching review by directory fingerprint
+            dir_fingerprint = review_manager.compute_dir_fingerprint(repo_path)
+            matching_id = review_manager.find_matching_review(str(repo_path), dir_fingerprint)
+            if matching_id:
+                console.print(f"[yellow]Found matching review: {matching_id}[/yellow]")
+                resume = input("Resume this review? [Y/n]: ").strip().lower()
+                if resume in ("", "y", "yes"):
+                    review_state = review_manager.load_review(matching_id)
+                else:
+                    review_state = review_manager.create_review(str(repo_path), question, dir_fingerprint)
+            else:
+                review_state = review_manager.create_review(str(repo_path), question, dir_fingerprint)
+        
+        console.print(f"[dim]Review ID: {review_state.review_id}[/dim]")
+
     files = scan_repo_files(
         repo_path, args.include_yaml, args.include_helm, args.max_file_bytes, args.max_files
     )
@@ -951,6 +1069,15 @@ def main() -> None:
     prioritized_info = analyzer.run_prioritization_stage(
         files, question, args.debug, args.prioritize_top
     )
+    
+    # Save checkpoint after prioritization
+    if review_state:
+        review_manager.add_checkpoint(
+            review_state.review_id,
+            "prioritization",
+            {"prioritized_files": prioritized_info or []},
+            files_analyzed=[str(f) for f in files[:20]]  # First 20 for checkpoint
+        )
 
     files_to_analyze = files
     if prioritized_info:
@@ -990,8 +1117,33 @@ def main() -> None:
 
     impact_order = {"CRITICAL": 4, "HIGH": 3, "MEDIUM": 2, "LOW": 1}
     findings.sort(key=lambda f: impact_order.get(f.impact, 0), reverse=True)
+    
+    # Save checkpoint after deep dive
+    if review_state:
+        review_manager.update_findings(review_state.review_id, findings)
+        # Update files_analyzed in review state
+        state = review_manager.load_review(review_state.review_id)
+        state.files_analyzed = [str(f) for f in files_to_analyze]
+        review_manager.save_review(state)
+        review_manager.add_checkpoint(
+            review_state.review_id,
+            "deep_dive",
+            {"findings_count": len(findings)},
+            files_analyzed=[str(f) for f in files_to_analyze],
+            findings_count=len(findings)
+        )
 
     synthesis = analyzer.run_synthesis_stage(findings, question)
+    
+    # Save checkpoint after synthesis
+    if review_state:
+        review_manager.update_synthesis(review_state.review_id, synthesis)
+        review_manager.add_checkpoint(
+            review_state.review_id,
+            "synthesis",
+            {"synthesis_length": len(synthesis)},
+            findings_count=len(findings)
+        )
 
     report = AnalysisReport(
         repo_path=str(repo_path),
@@ -1061,6 +1213,12 @@ def main() -> None:
 
     if args.save_conversations:
         cache.save_session_log()
+    
+    # Mark review as completed if review state was enabled
+    if review_state:
+        review_manager.mark_completed(review_state.review_id)
+        console.print(f"\n[green]✓ Review state saved: {review_state.review_id}[/green]")
+        console.print(f"[dim]Context file: .gowasp_cache/reviews/_{review_state.review_id}_context.md[/dim]")
 
 
 if __name__ == "__main__":

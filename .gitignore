@@ -10,6 +10,8 @@ scanner
 *output*
 *.gowasp.cache*
 
+*WebGoat*
+
 # Output binaries
 /bin/
 /build/
