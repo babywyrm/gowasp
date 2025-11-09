@@ -79,7 +79,7 @@ class Orchestrator:
         return finding_level >= threshold_level
 
     def run_static_scanner(self) -> List[Finding]:
-        """Runs the gowasp scanner and extracts the JSON array from its output."""
+        """Runs the scrynet scanner and extracts the JSON array from its output."""
         cmd = [str(self.scanner_bin), "--dir", str(self.repo_path), "--output", "json"]
         if self.severity:
             cmd.extend(["--severity", self.severity])
@@ -88,7 +88,7 @@ class Orchestrator:
         if self.verbose:
             cmd.append("--verbose")
             
-        print(f"\n1) Running static gowasp scanner...\n   Running: {' '.join(cmd)}")
+        print(f"\n1) Running static scrynet scanner...\n   Running: {' '.join(cmd)}")
         proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode != 0:
             print(f"WARNING: scanner exited with code {proc.returncode}", file=sys.stderr)
@@ -299,13 +299,13 @@ class Orchestrator:
 def main() -> None:
     """Parses command-line arguments and runs the orchestrator."""
     parser = argparse.ArgumentParser(
-        description="Orchestrator for gowasp and Claude scanners.",
+        description="Orchestrator for scrynet and Claude scanners.",
         formatter_class=argparse.RawTextHelpFormatter
     )
     
     # Positional Arguments
     parser.add_argument("repo_path", type=Path, help="Path to the repository to scan.")
-    parser.add_argument("scanner_bin", type=Path, help="Path to the gowasp scanner binary.")
+    parser.add_argument("scanner_bin", type=Path, help="Path to the scrynet scanner binary.")
     
     # Scan Configuration
     parser.add_argument("--profile", type=str.lower, default="owasp", help="Comma-separated list of AI analysis profiles (e.g., 'owasp,performance').")
@@ -317,7 +317,7 @@ def main() -> None:
     
     # Execution & Output Control
     parser.add_argument("--parallel", action="store_true", help="Run Claude analysis in parallel.")
-    parser.add_argument("--verbose", action="store_true", help="Show live Claude results and gowasp remediation advice.")
+    parser.add_argument("--verbose", action="store_true", help="Show live Claude results and scrynet remediation advice.")
     parser.add_argument("--debug", action="store_true", help="Enable debug mode for troubleshooting.")
     
     args = parser.parse_args()

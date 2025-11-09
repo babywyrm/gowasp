@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 
 class Orchestrator:
-    """Coordinates gowasp static scan, Claude AI analysis, and threat modeling."""
+    """Coordinates scrynet static scan, Claude AI analysis, and threat modeling."""
 
     def __init__(self, repo_path: Path, scanner_bin: Path, parallel: bool, debug: bool,
                  severity: Optional[str], profiles: str, static_rules: Optional[str],
@@ -124,7 +124,7 @@ class Orchestrator:
         return None
 
     def run_static_scanner(self) -> List[Finding]:
-        """Invoke gowasp scanner binary and parse JSON results."""
+        """Invoke scrynet scanner binary and parse JSON results."""
         cmd = [str(self.scanner_bin), "--dir", str(self.repo_path), "--output", "json"]
         if self.severity:
             cmd.extend(["--severity", self.severity])
@@ -132,11 +132,11 @@ class Orchestrator:
             cmd.extend(["--rules", self.static_rules])
         if self.verbose:
             cmd.append("--verbose")
-        logger.info("1) Running static gowasp scanner...")
+        logger.info("1) Running static scrynet scanner...")
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, check=True)
         except subprocess.CalledProcessError as e:
-            logger.error(f"gowasp scanner failed: {e.stderr}")
+            logger.error(f"scrynet scanner failed: {e.stderr}")
             return []
         out = proc.stdout
         start = out.find('[')
@@ -308,6 +308,8 @@ class Orchestrator:
     def run(self) -> None:
         """Execute static scan, AI analysis, merge, and export findings."""
         static_findings = self.run_static_scanner()
+        for finding in static_findings:
+            finding['source'] = 'scrynet'
         static_output_file = self.output_path / "static_findings.json"
         with open(static_output_file, "w", encoding="utf-8") as f:
             json.dump(static_findings, f, indent=2)
@@ -385,15 +387,15 @@ class Orchestrator:
 def main() -> None:
     """CLI parser and entrypoint."""
     parser = argparse.ArgumentParser(
-        description="Orchestrator for gowasp and Claude scanners.",
+        description="Orchestrator for scrynet and Claude scanners.",
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument("repo_path", type=Path, help="Path to repo to scan.")
-    parser.add_argument("scanner_bin", type=Path, help="Path to gowasp scanner binary.")
+    parser.add_argument("scanner_bin", type=Path, help="Path to scrynet scanner binary.")
     parser.add_argument("--profile", type=str.lower, default="owasp",
                         help="Comma-separated list of AI profiles (e.g., 'owasp,performance').")
     parser.add_argument("--static-rules", type=str,
-                        help="Comma-separated paths to static rule files for gowasp.")
+                        help="Comma-separated paths to static rule files for scrynet.")
     parser.add_argument("--severity", type=str.upper,
                         choices=[s.name for s in Severity],
                         help="Minimum severity to report.")

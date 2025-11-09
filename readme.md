@@ -1,4 +1,4 @@
-# GOWASP Hybrid Security Scanner ~~beta~~
+# SCRYNET Hybrid Security Scanner ~~beta~~
 
 Do you hate reviews.
 
@@ -12,7 +12,7 @@ Do you miss the 90s.
 
 # Read On
 
-GOWASP is a lightweight, multi-language static analysis tool that detects OWASP Top 10 security issues—and more—in your source code.
+SCRYNET is a lightweight, multi-language static analysis tool that detects OWASP Top 10 security issues—and more—in your source code.
 
 It operates in two modes:
 
@@ -39,7 +39,7 @@ It supports Go, JS, Python, Java, PHP, HTML, and can output in text, JSON, or Ma
 
 -   **Hybrid Analysis:** Combines the Go scanner's static findings with Claude AI's contextual OWASP analysis.
 -   **Expert Mode:** Supports multiple, swappable AI analysis profiles (`--profile`) and a repo-level, attacker-perspective threat model (`--threat-model`).
--   **Traceability:** Adds a `source` field (`"gowasp"` or `"claude-owasp"`) to every finding in the final report.
+-   **Traceability:** Adds a `source` field (`"scrynet"` or `"claude-owasp"`) to every finding in the final report.
 -   **Organized Outputs:** Creates a unique output directory for each scanned repository (e.g., `output/dvja_src/`).
 -   **Secure by Default:** Securely reads the `CLAUDE_API_KEY` from your environment, not from the code.
 -   **Flexible Execution:** Supports both safe sequential mode and a faster `--parallel` mode for AI calls.
@@ -53,11 +53,11 @@ The setup is a two-step process: first build the Go scanner, then set up the Pyt
 ### 1. Build the Go Scanner
 
 ```bash
-git clone https://github.com/babywyrm/gowasp.git
-cd gowasp/gowasp
+git clone https://github.com/babywyrm/scrynet.git
+cd scrynet/scrynet
 
 # Build the scanner binary
-go build -o scanner gowasp.go
+go build -o scanner scrynet.go
 
 ```
 
@@ -123,7 +123,7 @@ python3 runner__.py <repo_path> <scanner_bin> [options]
 | `--severity` | Minimum severity to report from **both** scanners (e.g., `HIGH`). |
 | `--threat-model` | **Expert Mode:** Perform a repo-level, attacker-perspective threat model. |
 | `--parallel` | Run Claude analysis in parallel (faster, but may hit rate limits). |
-| `--verbose` | Show live Claude results and gowasp remediation advice. |
+| `--verbose` | Show live Claude results and scrynet remediation advice. |
 | `--debug` | Enable verbose debug output for troubleshooting. |
 
 ---
@@ -207,4 +207,4 @@ output/
 2.  **For Deep Reviews:** Use the `python3 runner__.py` orchestrator for a comprehensive security assessment before a major release or during a security audit.
 3.  **Start Focused:** Begin with `--severity HIGH` to tackle the most critical issues first.
 4.  **Reduce Noise:** Use `--ignore` or a `.scannerignore` file to exclude test files, dependencies, and generated code.
-5.  **Trace Findings:** In the `combined_findings.json` file, use the `"source"` field to see whether a vulnerability was found by `"gowasp"` or `"claude-owasp"`.
+5.  **Trace Findings:** In the `combined_findings.json` file, use the `"source"` field to see whether a vulnerability was found by `"scrynet"` or `"claude-owasp"`.

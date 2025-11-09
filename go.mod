@@ -1,4 +1,4 @@
-module gowasp
+module scrynet
 
 go 1.23.0
 
