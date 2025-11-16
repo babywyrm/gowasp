@@ -1,0 +1,31 @@
+{
+  "stage": "prioritization",
+  "file": null,
+  "prompt": "You are a lead software architect. Your task is to identify the most critical files to analyze to answer the user's question.\n\nUser Question: \"find all security vulnerabilities and suggest remediations\"\n\nFile List:\n[\n  \"FileServer.java\",\n  \"MvcConfiguration.java\",\n  \"ParentConfig.java\",\n  \"StartWebGoat.java\",\n  \"WebSecurityConfig.java\",\n  \"WebWolf.java\",\n  \"WebWolfRedirect.java\"\n]\n\nReturn a JSON object with a single key \"prioritized_files\". This key should contain a list of objects, where each object has a \"file_name\" and a \"reason\" explaining its relevance. Limit the list to the top 15 most relevant files. Your response must contain ONLY the JSON object.\nExample:\n{\n  \"prioritized_files\": [\n    {\n      \"file_name\": \"UserService.java\",\n      \"reason\": \"This file likely handles user creation and authentication, which is central to the user's security question.\"\n    },\n    {\n      \"file_name\": \"JwtUtil.java\",\n      \"reason\": \"This file probably manages JWT token generation and validation, a critical component of authorization.\"\n    }\n  ]\n}",
+  "raw_response": "{\n  \"prioritized_files\": [\n    {\n      \"file_name\": \"WebSecurityConfig.java\",\n      \"reason\": \"Primary security configuration file responsible for defining authentication, authorization, and security rules\"\n    },\n    {\n      \"file_name\": \"MvcConfiguration.java\",\n      \"reason\": \"Potentially contains configuration settings that could impact application security and request handling\"\n    },\n    {\n      \"file_name\": \"StartWebGoat.java\",\n      \"reason\": \"Main application startup file that may expose initial security configuration and entry points\"\n    },\n    {\n      \"file_name\": \"ParentConfig.java\",\n      \"reason\": \"Parent configuration file that might define overarching security or application-wide settings\"\n    },\n    {\n      \"file_name\": \"WebWolf.java\",\n      \"reason\": \"Additional web-related configuration that could have security implications\"\n    }\n  ]\n}",
+  "parsed": {
+    "prioritized_files": [
+      {
+        "file_name": "WebSecurityConfig.java",
+        "reason": "Primary security configuration file responsible for defining authentication, authorization, and security rules"
+      },
+      {
+        "file_name": "MvcConfiguration.java",
+        "reason": "Potentially contains configuration settings that could impact application security and request handling"
+      },
+      {
+        "file_name": "StartWebGoat.java",
+        "reason": "Main application startup file that may expose initial security configuration and entry points"
+      },
+      {
+        "file_name": "ParentConfig.java",
+        "reason": "Parent configuration file that might define overarching security or application-wide settings"
+      },
+      {
+        "file_name": "WebWolf.java",
+        "reason": "Additional web-related configuration that could have security implications"
+      }
+    ]
+  },
+  "timestamp": "2025-11-16T02:20:40.039824+00:00"
+}

@@ -1,0 +1,17 @@
+{
+  "stage": "payload",
+  "file": "WebGoat/src/main/java/org/owasp/webgoat/webwolf/WebSecurityConfig.java",
+  "prompt": "You are a security testing expert. For the following vulnerability finding, generate example payloads for both offensive verification (Red Team) and defensive testing (Blue Team). This is for authorized, educational purposes only.\n\nVULNERABILITY CONTEXT:\nFile: WebGoat/src/main/java/org/owasp/webgoat/webwolf/WebSecurityConfig.java\nLine: 69\nFinding: Using NoOpPasswordEncoder with no password hashing\n\nCODE SNIPPET:\n/*\n * SPDX-FileCopyrightText: Copyright \u00a9 2016 WebGoat authors\n * SPDX-License-Identifier: GPL-2.0-or-later\n */\npackage org.owasp.webgoat.webwolf;\n\nimport lombok.AllArgsConstructor;\nimport org.owasp.webgoat.container.AjaxAuthenticationEntryPoint;\nimport org.owasp.webgoat.webwolf.user.UserService;\nimport org.springframework.beans.factory.annotation.Autowired;\nimport org.springframework.context.annotation.Bean;\nimport org.springframework.context.annotation.Configuration;\nimport org.springframework\n\nTASK:\nProvide your response in a single, clean JSON object with the following structure. Do not include any text outside the JSON.\n{\n  \"red_team_payload\": {\n    \"payload\": \"A simple, non-destructive payload to verify the flaw's existence.\",\n    \"explanation\": \"A brief explanation of why this payload works for verification.\"\n  },\n  \"blue_team_payload\": {\n    \"payload\": \"A payload that can be used in a unit test or WAF rule to test the fix.\",\n    \"explanation\": \"A brief explanation of how this payload helps test the defensive measure.\"\n  }\n}",
+  "raw_response": "{\n  \"red_team_payload\": {\n    \"payload\": \"user:user123\",\n    \"explanation\": \"The NoOpPasswordEncoder stores passwords in plain text, allowing easy credential guessing by simply using the username as the password. This payload demonstrates the lack of password protection by attempting a direct login with a predictable credential.\"\n  },\n  \"blue_team_payload\": {\n    \"payload\": \"assert BCryptPasswordEncoder.getInstance().matches('plaintextPassword', encodedPassword) == false\",\n    \"explanation\": \"This test payload checks that a BCryptPasswordEncoder is used instead of NoOpPasswordEncoder by verifying that plain text passwords do not match encoded passwords, forcing proper password hashing and salt generation.\"\n  }\n}",
+  "parsed": {
+    "red_team_payload": {
+      "payload": "user:user123",
+      "explanation": "The NoOpPasswordEncoder stores passwords in plain text, allowing easy credential guessing by simply using the username as the password. This payload demonstrates the lack of password protection by attempting a direct login with a predictable credential."
+    },
+    "blue_team_payload": {
+      "payload": "assert BCryptPasswordEncoder.getInstance().matches('plaintextPassword', encodedPassword) == false",
+      "explanation": "This test payload checks that a BCryptPasswordEncoder is used instead of NoOpPasswordEncoder by verifying that plain text passwords do not match encoded passwords, forcing proper password hashing and salt generation."
+    }
+  },
+  "timestamp": "2025-11-16T02:26:19.743804+00:00"
+}

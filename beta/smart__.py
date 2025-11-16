@@ -120,11 +120,30 @@ class CacheManager:
         h.update(f"{stage}|{file or ''}|{prompt}".encode("utf-8"))
         return h.hexdigest()[:16]
 
-    def get(self, stage: str, file: Optional[str], prompt: str) -> Optional[ConversationLog]:
+    def _namespace_dir(self, repo_path: Optional[str], model: Optional[str]) -> Path:
+        """Return namespaced cache directory for a given repo/model pair."""
+        ns_parts = []
+        if repo_path:
+            try:
+                from review_state import ReviewStateManager  # lazy import
+                fp = ReviewStateManager(self.cache_dir).compute_dir_fingerprint(Path(repo_path))
+            except Exception:
+                fp = hashlib.sha256(str(repo_path).encode("utf-8")).hexdigest()[:16]
+            ns_parts.append(fp)
+        if model:
+            ns_parts.append(model.replace("/", "_"))
+        if not ns_parts:
+            return self.cache_dir
+        ns = self.cache_dir.joinpath(*ns_parts)
+        ns.mkdir(parents=True, exist_ok=True)
+        return ns
+
+    def get(self, stage: str, file: Optional[str], prompt: str, repo_path: Optional[str] = None, model: Optional[str] = None) -> Optional[ConversationLog]:
         if not self.use_cache:
             return None
         key = self._hash_key(stage, file, prompt)
-        path = self.cache_dir / f"{key}.json"
+        base = self._namespace_dir(repo_path, model)
+        path = base / f"{key}.json"
         if path.exists():
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
@@ -134,7 +153,8 @@ class CacheManager:
         return None
 
     def save(
-        self, stage: str, file: Optional[str], prompt: str, raw: str, parsed: Optional[dict]
+        self, stage: str, file: Optional[str], prompt: str, raw: str, parsed: Optional[dict],
+        repo_path: Optional[str] = None, model: Optional[str] = None
     ) -> ConversationLog:
         entry = ConversationLog(
             stage=stage,
@@ -145,7 +165,8 @@ class CacheManager:
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
         key = self._hash_key(stage, file, prompt)
-        path = self.cache_dir / f"{key}.json"
+        base = self._namespace_dir(repo_path, model)
+        path = base / f"{key}.json"
         path.write_text(json.dumps(asdict(entry), indent=2), encoding="utf-8")
         self.session_logs.append(entry)
         return entry
@@ -158,6 +179,62 @@ class CacheManager:
         )
         data = [asdict(log) for log in self.session_logs]
         session_file.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    # --- Management APIs ---
+    def stats(self) -> Dict[str, Any]:
+        """Return basic statistics about cache usage."""
+        total_files = 0
+        total_bytes = 0
+        for p in self.cache_dir.rglob("*.json"):
+            try:
+                total_files += 1
+                total_bytes += p.stat().st_size
+            except OSError:
+                pass
+        return {"dir": str(self.cache_dir), "files": total_files, "bytes": total_bytes}
+
+    def list_entries(self, limit: int = 50) -> List[str]:
+        """List cache files (most recent first)."""
+        items = []
+        files = sorted(self.cache_dir.rglob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for p in files[:limit]:
+            items.append(str(p.relative_to(self.cache_dir)))
+        return items
+
+    def prune_older_than(self, days: int) -> int:
+        """Delete cache files older than N days. Returns number deleted."""
+        cutoff = time.time() - (days * 86400)
+        deleted = 0
+        for p in self.cache_dir.rglob("*.json"):
+            try:
+                if p.stat().st_mtime < cutoff:
+                    p.unlink(missing_ok=True)
+                    deleted += 1
+            except OSError:
+                pass
+        return deleted
+
+    def clear_all(self) -> int:
+        """Clear all cache files. Returns number deleted."""
+        deleted = 0
+        for p in self.cache_dir.rglob("*.json"):
+            try:
+                p.unlink(missing_ok=True)
+                deleted += 1
+            except OSError:
+                pass
+        return deleted
+
+    def export(self, out_file: Path) -> None:
+        """Export a manifest of cache entries (paths + first 200 chars)."""
+        manifest: List[Dict[str, Any]] = []
+        for p in self.cache_dir.rglob("*.json"):
+            try:
+                text = p.read_text(encoding="utf-8")
+                manifest.append({"path": str(p.relative_to(self.cache_dir)), "preview": text[:200]})
+            except Exception:
+                continue
+        out_file.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
 
 # ---------- Helpers ----------
@@ -234,14 +311,15 @@ class SmartAnalyzer:
         self.cache = cache
 
     def _call_claude(
-        self, stage: str, file: Optional[str], prompt: str, max_tokens: int = 4000
+        self, stage: str, file: Optional[str], prompt: str, max_tokens: int = 4000,
+        repo_path: Optional[str] = None
     ) -> Optional[str]:
         # Input validation to prevent memory exhaustion
         if not prompt or len(prompt) > 100_000:
             self.console.print(f"[red]Invalid prompt length: {len(prompt)} bytes (max 100,000)[/red]")
             return None
         
-        cached = self.cache.get(stage, file, prompt)
+        cached = self.cache.get(stage, file, prompt, repo_path=repo_path, model=CLAUDE_MODEL)
         if cached:
             self.console.print(f"[dim]Cache hit for {stage} ({file or 'n/a'})[/dim]")
             return cached.raw_response
@@ -253,7 +331,7 @@ class SmartAnalyzer:
             )
             raw = response.content[0].text if response.content else ""
             parsed = parse_json_response(raw)
-            self.cache.save(stage, file, prompt, raw, parsed)
+            self.cache.save(stage, file, prompt, raw, parsed, repo_path=repo_path, model=CLAUDE_MODEL)
             return raw
         except Exception as e:
             self.console.print(f"[red]API Error: {e}[/red]")
@@ -266,7 +344,7 @@ class SmartAnalyzer:
         if not all_files:
             return None
         prompt = PromptFactory.prioritization(all_files, question, limit)
-        raw = self._call_claude("prioritization", None, prompt)
+        raw = self._call_claude("prioritization", None, prompt, repo_path=str(Path.cwd()))
         if not raw:
             return None
         if debug:
@@ -309,7 +387,7 @@ class SmartAnalyzer:
             else:
                 prompt = PromptFactory.deep_dive(file_path, content, question)
 
-            raw = self._call_claude("deep_dive", str(file_path), prompt)
+            raw = self._call_claude("deep_dive", str(file_path), prompt, repo_path=str(Path(file_path).anchor or Path.cwd()))
             if not raw:
                 continue
             if debug:
@@ -373,7 +451,7 @@ class SmartAnalyzer:
         if not findings:
             return "No insights were found to synthesize."
         prompt = PromptFactory.synthesis(findings, question)
-        raw = self._call_claude("synthesis", None, prompt)
+        raw = self._call_claude("synthesis", None, prompt, repo_path=str(Path.cwd()))
         self.console.print("[green]✓ Synthesis complete.[/green]\n")
         return raw or "Synthesis failed."
 
@@ -383,7 +461,7 @@ class SmartAnalyzer:
             try:
                 content = Path(finding.file_path).read_text(encoding="utf-8", errors="ignore")
                 prompt = PromptFactory.annotation(finding, content)
-                raw = self._call_claude("annotation", finding.file_path, prompt)
+                raw = self._call_claude("annotation", finding.file_path, prompt, repo_path=str(Path(finding.file_path).anchor or Path.cwd()))
                 if not raw:
                     continue
                 if debug:
@@ -409,7 +487,7 @@ class SmartAnalyzer:
             except Exception:
                 snippet = "Could not read snippet."
             prompt = PromptFactory.payload_generation(f, snippet[:500])
-            raw = self._call_claude("payload", f.file_path, prompt)
+            raw = self._call_claude("payload", f.file_path, prompt, repo_path=str(Path(f.file_path).anchor or Path.cwd()))
             if not raw:
                 continue
             if debug:
@@ -925,6 +1003,13 @@ def create_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Show unified diff of changes when writing optimized files (requires --optimize-output)"
     )
+
+    # Cache management (optional, non-breaking)
+    p.add_argument("--cache-info", action="store_true", help="Show cache statistics and exit")
+    p.add_argument("--cache-list", action="store_true", help="List recent cache entries and exit")
+    p.add_argument("--cache-prune", type=int, metavar="DAYS", help="Prune cache entries older than DAYS and exit")
+    p.add_argument("--cache-clear", action="store_true", help="Clear all cache entries and exit")
+    p.add_argument("--cache-export", metavar="FILE", help="Export cache manifest to FILE and exit")
     
     # Review state management flags (optional, non-breaking)
     if REVIEW_STATE_AVAILABLE:
@@ -1013,6 +1098,37 @@ def main() -> None:
     api_key = get_api_key()
     client = anthropic.Anthropic(api_key=api_key)
     cache = CacheManager(args.cache_dir, use_cache=not args.no_cache)
+
+    # Handle cache management requests
+    if args.cache_info:
+        stats = cache.stats()
+        console.print(Panel(f"Dir: {stats['dir']}\nFiles: {stats['files']}\nBytes: {stats['bytes']}", title="Cache Info", border_style="blue"))
+        return
+    if args.cache_list:
+        items = cache.list_entries()
+        if not items:
+            console.print("[yellow]No cache entries found.[/yellow]")
+        else:
+            table = Table(title="Recent Cache Entries")
+            table.add_column("Path", style="cyan")
+            for it in items:
+                table.add_row(it)
+            console.print(table)
+        return
+    if args.cache_prune is not None:
+        deleted = cache.prune_older_than(args.cache_prune)
+        console.print(f"[green]Pruned {deleted} cache file(s) older than {args.cache_prune} days[/green]")
+        return
+    if args.cache_clear:
+        deleted = cache.clear_all()
+        console.print(f"[green]Cleared {deleted} cache file(s)[/green]")
+        return
+    if args.cache_export:
+        out_file = Path(args.cache_export)
+        cache.export(out_file)
+        console.print(f"[green]Cache manifest exported to {out_file}[/green]")
+        return
+
     analyzer = SmartAnalyzer(console, client, cache)
 
     repo_path = Path(args.repo_path)

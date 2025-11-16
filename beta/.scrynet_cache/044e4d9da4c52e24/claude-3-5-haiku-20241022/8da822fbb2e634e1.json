@@ -1,0 +1,17 @@
+{
+  "stage": "payload",
+  "file": "WebGoat/src/main/java/org/owasp/webgoat/container/WebWolfRedirect.java",
+  "prompt": "You are a security testing expert. For the following vulnerability finding, generate example payloads for both offensive verification (Red Team) and defensive testing (Blue Team). This is for authorized, educational purposes only.\n\nVULNERABILITY CONTEXT:\nFile: WebGoat/src/main/java/org/owasp/webgoat/container/WebWolfRedirect.java\nLine: 17\nFinding: Potential Open Redirect Vulnerability\n\nCODE SNIPPET:\n/*\n * SPDX-FileCopyrightText: Copyright \u00a9 2022 WebGoat authors\n * SPDX-License-Identifier: GPL-2.0-or-later\n */\npackage org.owasp.webgoat.container;\n\nimport lombok.RequiredArgsConstructor;\nimport org.springframework.context.ApplicationContext;\nimport org.springframework.stereotype.Controller;\nimport org.springframework.web.bind.annotation.GetMapping;\nimport org.springframework.web.servlet.ModelAndView;\n\n@Controller\n@RequiredArgsConstructor\npublic class WebWolfRedirect {\n\n  private final Applicat\n\nTASK:\nProvide your response in a single, clean JSON object with the following structure. Do not include any text outside the JSON.\n{\n  \"red_team_payload\": {\n    \"payload\": \"A simple, non-destructive payload to verify the flaw's existence.\",\n    \"explanation\": \"A brief explanation of why this payload works for verification.\"\n  },\n  \"blue_team_payload\": {\n    \"payload\": \"A payload that can be used in a unit test or WAF rule to test the fix.\",\n    \"explanation\": \"A brief explanation of how this payload helps test the defensive measure.\"\n  }\n}",
+  "raw_response": "{\n  \"red_team_payload\": {\n    \"payload\": \"https://attacker.com/malicious-site\",\n    \"explanation\": \"This payload demonstrates an open redirect by attempting to redirect users to a malicious external domain, which would indicate the lack of proper URL validation or sanitization.\"\n  },\n  \"blue_team_payload\": {\n    \"payload\": \"https://evil.com/%0d%0ASet-Cookie:%20malicious=test\",\n    \"explanation\": \"This test payload checks if the redirect mechanism properly sanitizes and validates URLs, looking for potential header injection or additional redirect vulnerabilities by including a newline character to attempt splitting HTTP headers.\"\n  }\n}",
+  "parsed": {
+    "red_team_payload": {
+      "payload": "https://attacker.com/malicious-site",
+      "explanation": "This payload demonstrates an open redirect by attempting to redirect users to a malicious external domain, which would indicate the lack of proper URL validation or sanitization."
+    },
+    "blue_team_payload": {
+      "payload": "https://evil.com/%0d%0ASet-Cookie:%20malicious=test",
+      "explanation": "This test payload checks if the redirect mechanism properly sanitizes and validates URLs, looking for potential header injection or additional redirect vulnerabilities by including a newline character to attempt splitting HTTP headers."
+    }
+  },
+  "timestamp": "2025-11-16T02:26:41.491748+00:00"
+}

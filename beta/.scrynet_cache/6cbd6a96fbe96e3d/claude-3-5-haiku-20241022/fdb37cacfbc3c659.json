@@ -1,0 +1,23 @@
+{
+  "stage": "payload",
+  "file": "WebGoat/src/main/java/org/owasp/webgoat/webwolf/FileServer.java",
+  "prompt": "You are a security testing expert. For the following vulnerability finding, generate example payloads for both offensive verification (Red Team) and defensive testing (Blue Team). This is for authorized, educational purposes only.\n\nVULNERABILITY CONTEXT:\nFile: WebGoat/src/main/java/org/owasp/webgoat/webwolf/FileServer.java\nLine: 50\nFinding: Potential Path Traversal Vulnerability in File Upload\n\nCODE SNIPPET:\n/*\n * SPDX-FileCopyrightText: Copyright \u00a9 2017 WebGoat authors\n * SPDX-License-Identifier: GPL-2.0-or-later\n */\npackage org.owasp.webgoat.webwolf;\n\nimport static java.util.Comparator.comparing;\nimport static org.springframework.http.MediaType.ALL_VALUE;\n\nimport jakarta.servlet.http.HttpServletRequest;\nimport java.io.File;\nimport java.io.IOException;\nimport java.io.InputStream;\nimport java.nio.file.Files;\nimport java.nio.file.attribute.FileTime;\nimport java.time.ZonedDateTime;\nimport java.time.fo\n\nTASK:\nProvide your response in a single, clean JSON object with the following structure. Do not include any text outside the JSON.\n{\n  \"red_team_payload\": {\n    \"payload\": \"A simple, non-destructive payload to verify the flaw's existence.\",\n    \"explanation\": \"A brief explanation of why this payload works for verification.\"\n  },\n  \"blue_team_payload\": {\n    \"payload\": \"A payload that can be used in a unit test or WAF rule to test the fix.\",\n    \"explanation\": \"A brief explanation of how this payload helps test the defensive measure.\"\n  }\n}",
+  "raw_response": "{\n  \"red_team_payload\": {\n    \"payload\": \"../../../etc/passwd\",\n    \"explanation\": \"This payload attempts to exploit path traversal by using relative directory traversal syntax to access sensitive system files outside the intended upload directory, demonstrating the vulnerability's potential for unauthorized file access.\"\n  },\n  \"blue_team_payload\": {\n    \"payload\": [\"../\", \"..\\\\\", \"/etc/\", \"\\\\windows\\\\\", \"../../\"],\n    \"explanation\": \"These payloads represent a comprehensive set of path traversal test cases that can be used in input validation checks, unit tests, or WAF rules to detect and block potential path traversal attempts across different path separator styles.\"\n  }\n}",
+  "parsed": {
+    "red_team_payload": {
+      "payload": "../../../etc/passwd",
+      "explanation": "This payload attempts to exploit path traversal by using relative directory traversal syntax to access sensitive system files outside the intended upload directory, demonstrating the vulnerability's potential for unauthorized file access."
+    },
+    "blue_team_payload": {
+      "payload": [
+        "../",
+        "..\\",
+        "/etc/",
+        "\\windows\\",
+        "../../"
+      ],
+      "explanation": "These payloads represent a comprehensive set of path traversal test cases that can be used in input validation checks, unit tests, or WAF rules to detect and block potential path traversal attempts across different path separator styles."
+    }
+  },
+  "timestamp": "2025-11-16T02:26:25.454836+00:00"
+}
