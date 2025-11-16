@@ -305,10 +305,14 @@ def scan_repo_files(
 
 # ---------- Core Analyzer ----------
 class SmartAnalyzer:
-    def __init__(self, console: Console, client: anthropic.Anthropic, cache: CacheManager):
+    def __init__(self, console: Console, client: anthropic.Anthropic, cache: CacheManager, *, model: str, default_max_tokens: int, temperature: float, repo_root: Optional[Path] = None):
         self.console = console
         self.client = client
         self.cache = cache
+        self.model = model
+        self.default_max_tokens = default_max_tokens
+        self.temperature = temperature
+        self.repo_root = repo_root
 
     def _call_claude(
         self, stage: str, file: Optional[str], prompt: str, max_tokens: int = 4000,
@@ -319,19 +323,20 @@ class SmartAnalyzer:
             self.console.print(f"[red]Invalid prompt length: {len(prompt)} bytes (max 100,000)[/red]")
             return None
         
-        cached = self.cache.get(stage, file, prompt, repo_path=repo_path, model=CLAUDE_MODEL)
+        cached = self.cache.get(stage, file, prompt, repo_path=repo_path, model=self.model)
         if cached:
             self.console.print(f"[dim]Cache hit for {stage} ({file or 'n/a'})[/dim]")
             return cached.raw_response
         try:
             response = self.client.messages.create(
-                model=CLAUDE_MODEL,
+                model=self.model,
                 max_tokens=max_tokens,
                 messages=[{"role": "user", "content": prompt}],
+                temperature=self.temperature,
             )
             raw = response.content[0].text if response.content else ""
             parsed = parse_json_response(raw)
-            self.cache.save(stage, file, prompt, raw, parsed, repo_path=repo_path, model=CLAUDE_MODEL)
+            self.cache.save(stage, file, prompt, raw, parsed, repo_path=repo_path, model=self.model)
             return raw
         except Exception as e:
             self.console.print(f"[red]API Error: {e}[/red]")
@@ -965,7 +970,10 @@ def create_parser() -> argparse.ArgumentParser:
         default=["console"],
         choices=["console", "html", "markdown", "json"],
     )
-    p.add_argument("--output", "-o", help="Base output filename")
+    # Model and generation controls
+    p.add_argument("--model", default=CLAUDE_MODEL, help="Override Claude model identifier")
+    p.add_argument("--max-tokens", type=int, default=4000, help="Max tokens per response")
+    p.add_argument("--temperature", type=float, default=0.0, help="Sampling temperature (0.0 determinism)")
     p.add_argument(
         "--top-n", type=int, default=5, help="Number of items for payload/annotation generation"
     )
@@ -1004,6 +1012,10 @@ def create_parser() -> argparse.ArgumentParser:
         help="Show unified diff of changes when writing optimized files (requires --optimize-output)"
     )
 
+    # Scan filters
+    p.add_argument("--include-exts", nargs="*", help="Only include these file extensions (e.g., .py .go)")
+    p.add_argument("--ignore-dirs", nargs="*", help="Additional directories to skip during scan")
+
     # Cache management (optional, non-breaking)
     p.add_argument("--cache-info", action="store_true", help="Show cache statistics and exit")
     p.add_argument("--cache-list", action="store_true", help="List recent cache entries and exit")
@@ -1017,6 +1029,11 @@ def create_parser() -> argparse.ArgumentParser:
             "--enable-review-state",
             action="store_true",
             help="Enable review state tracking for resuming reviews"
+        )
+        p.add_argument(
+            "--resume-last",
+            action="store_true",
+            help="Resume the most recent review matching the current repo (auto-detect)"
         )
         p.add_argument(
             "--resume-review",
@@ -1098,6 +1115,7 @@ def main() -> None:
     api_key = get_api_key()
     client = anthropic.Anthropic(api_key=api_key)
     cache = CacheManager(args.cache_dir, use_cache=not args.no_cache)
+    analyzer = SmartAnalyzer(console, client, cache, model=args.model, default_max_tokens=args.max_tokens, temperature=args.temperature, repo_root=None)
 
     # Handle cache management requests
     if args.cache_info:
@@ -1128,8 +1146,6 @@ def main() -> None:
         cache.export(out_file)
         console.print(f"[green]Cache manifest exported to {out_file}[/green]")
         return
-
-    analyzer = SmartAnalyzer(console, client, cache)
 
     repo_path = Path(args.repo_path)
     if not repo_path.exists():
@@ -1165,21 +1181,36 @@ def main() -> None:
             # Check for matching review by directory fingerprint
             dir_fingerprint = review_manager.compute_dir_fingerprint(repo_path)
             matching_id = review_manager.find_matching_review(str(repo_path), dir_fingerprint)
-            if matching_id:
-                console.print(f"[yellow]Found matching review: {matching_id}[/yellow]")
-                resume = input("Resume this review? [Y/n]: ").strip().lower()
-                if resume in ("", "y", "yes"):
-                    review_state = review_manager.load_review(matching_id)
+            if args.resume_last and matching_id:
+                review_state = review_manager.load_review(matching_id)
+                console.print(f"[green]✓ Auto-resumed latest matching review: {matching_id}[/green]")
+            else:
+                if matching_id:
+                    console.print(f"[yellow]Found matching review: {matching_id}[/yellow]")
+                    resume = input("Resume this review? [Y/n]: ").strip().lower()
+                    if resume in ("", "y", "yes"):
+                        review_state = review_manager.load_review(matching_id)
+                    else:
+                        review_state = review_manager.create_review(str(repo_path), question, dir_fingerprint)
                 else:
                     review_state = review_manager.create_review(str(repo_path), question, dir_fingerprint)
-            else:
-                review_state = review_manager.create_review(str(repo_path), question, dir_fingerprint)
         
         console.print(f"[dim]Review ID: {review_state.review_id}[/dim]")
+
+    # Build scan filters
+    extra_skips = set(args.ignore_dirs or [])
+    include_exts = set(args.include_exts or [])
 
     files = scan_repo_files(
         repo_path, args.include_yaml, args.include_helm, args.max_file_bytes, args.max_files
     )
+    # Apply include/ignore filters (post-filter to avoid changing core scanner semantics)
+    if include_exts:
+        include_exts = {e if e.startswith('.') else f'.{e}' for e in include_exts}
+        files = [f for f in files if f.suffix.lower() in include_exts]
+    if extra_skips:
+        files = [f for f in files if not any(skip in f.parts for skip in extra_skips)]
+
     console.print(f"\nFound [bold]{len(files)}[/bold] files to analyze.")
 
     prioritized_info = analyzer.run_prioritization_stage(

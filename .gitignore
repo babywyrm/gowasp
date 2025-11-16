@@ -9,9 +9,13 @@
 scanner
 *output*
 *.gowasp.cache*
+
+# scrynet cache
+.scrynet_cache/
 *.scrynet.cache*
 
 *WebGoat*
+*DVWA*
 
 # Output binaries
 /bin/

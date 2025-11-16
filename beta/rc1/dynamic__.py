@@ -104,7 +104,7 @@ Provide a concise analysis in this exact JSON format:
 CODE TO ANALYZE:
 {code_content}"""
 
-def analyze_file_with_claude(client: anthropic.Anthropic, file_path: Path, question: str, console: Console) -> Optional[str]:
+def analyze_file_with_claude(client: anthropic.Anthropic, file_path: Path, question: str, console: Console, *, model: str, max_tokens: int, temperature: float) -> Optional[str]:
     """Analyzes a single file using the Claude API."""
     try:
         content = file_path.read_text(encoding='utf-8', errors='ignore')
@@ -117,10 +117,10 @@ def analyze_file_with_claude(client: anthropic.Anthropic, file_path: Path, quest
         prompt = get_dynamic_prompt(file_path, content, question)
         
         response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=4000,
+            model=model,
+            max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.0
+            temperature=temperature,
         )
         return response.content[0].text
     except Exception as e:
@@ -219,6 +219,13 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument('--format', nargs='*', default=['console'], choices=['console', 'html', 'markdown', 'json'], help='One or more output formats.')
     parser.add_argument('--output', '-o', help='Base output file path (e.g., "report"). Suffix is ignored.')
     parser.add_argument('--no-color', action='store_true', help='Disable colorized output in the terminal.')
+    # Model and generation controls
+    parser.add_argument('--model', default='claude-3-5-sonnet-20241022', help='Claude model to use')
+    parser.add_argument('--max-tokens', type=int, default=4000, help='Max tokens per response')
+    parser.add_argument('--temperature', type=float, default=0.0, help='Sampling temperature (0.0 for determinism)')
+    # Scan filters
+    parser.add_argument('--include-exts', nargs='*', help='Only include these extensions (e.g., .py .go)')
+    parser.add_argument('--ignore-dirs', nargs='*', help='Additional directories to skip')
     return parser
 
 def main() -> None:
@@ -242,13 +249,20 @@ def main() -> None:
                         title="[bold blue]Dynamic Code Analyzer[/bold blue]"))
     
     files = scan_repo_files(args.repo_path)
+    # Post-filters
+    if args.include_exts:
+        include_exts = {e if e.startswith('.') else f'.{e}' for e in args.include_exts}
+        files = [f for f in files if f.suffix.lower() in include_exts]
+    if args.ignore_dirs:
+        skip_set = set(args.ignore_dirs)
+        files = [f for f in files if not any(skip in f.parts for skip in skip_set)]
     console.print(f"Found {len(files)} code files to analyze.\n")
     
     all_insights = []
     
     for i, file_path in enumerate(files, 1):
         console.print(f"[[bold]{i}/{len(files)}[/bold]] Analyzing [cyan]{file_path.name}[/cyan]...")
-        analysis = analyze_file_with_claude(client, file_path, question, console)
+        analysis = analyze_file_with_claude(client, file_path, question, console, model=args.model, max_tokens=args.max_tokens, temperature=args.temperature)
         if not analysis: continue
         
         parsed = parse_json_response(analysis)
